@@ -103,3 +103,7 @@ Validated locally on Windows in this workspace after building `Release`:
 - Save/Open dialogs use the classic Win32 common dialogs and do not support long-path edge cases.
 - On Windows 10/11, the app can register itself for `.md` / `.markdown`, but Windows still requires the user to confirm the default app choice in Settings.
 - No tabs, split view, settings UI, plugins, themes, or background services.
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](/C:/dev/App/LICENSE) for details.
