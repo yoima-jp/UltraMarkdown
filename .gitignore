@@ -1,4 +1,5 @@
 build/
+dist/
 debug-startup.log
 smoke.md
 smoke-save.md

@@ -35,6 +35,7 @@ The preview path does not reread files from disk. When switching from Raw to Pre
 - Windows 10 or 11
 - Visual Studio 2022 with C++ build tools
 - CMake 3.24+
+- Inno Setup 6 (installer build only)
 
 ### Configure
 
@@ -63,6 +64,27 @@ With a Markdown file:
 ```powershell
 .\build\Release\UltraMarkdown.exe C:\path\to\notes.md
 ```
+
+## Installer
+
+The repository includes an Inno Setup script at [`installer/UltraMarkdown.iss`](/C:/dev/App/installer/UltraMarkdown.iss).
+
+Build the installer after a `Release` build:
+
+```powershell
+ISCC.exe .\installer\UltraMarkdown.iss
+```
+
+The generated installer is written to `.\dist\UltraMarkdown-Setup.exe`.
+
+Installer behavior:
+
+- Installs `UltraMarkdown.exe` into `Program Files`
+- Creates Start Menu and optional desktop shortcuts
+- Registers `.md` and `.markdown` file associations during install
+- Refreshes Windows shell associations after install and uninstall
+
+On current Windows 10/11 builds, Microsoft protects some per-user default app choices. The installer registers UltraMarkdown as the Markdown handler and sets the standard association keys, but if a user has already pinned another app as the default, Windows may still require a manual confirmation in Settings.
 
 ## v1 Behavior
 
