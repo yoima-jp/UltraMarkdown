@@ -1,5 +1,7 @@
 #include "PreviewView.h"
 
+#include "LocalizedStrings.h"
+
 #include <algorithm>
 #include <cstring>
 #include <cwctype>
@@ -464,7 +466,7 @@ void PreviewView::RebuildLayout() {
     } else if (document_.blocks.empty()) {
         LayoutBlock emptyBlock;
         emptyBlock.source.type = PreviewBlockType::Paragraph;
-        emptyBlock.source.spans.push_back({L"(empty document)", {}});
+        emptyBlock.source.spans.push_back({LocalizeWide(UiString::PreviewEmptyDocument), {}});
         emptyBlock.top = y;
         layoutOneBlock(emptyBlock, TokenizeParagraph(emptyBlock.source.spans), columnLeft, usableRight);
         layout_.push_back(std::move(emptyBlock));
@@ -734,6 +736,7 @@ void PreviewView::Paint() {
     const COLORREF linkColor = RGB(14, 98, 191);
     const COLORREF selectionFill = RGB(206, 228, 255);
     const COLORREF selectionText = RGB(16, 54, 96);
+    const std::wstring emptyDocumentLabel = LocalizeWide(UiString::PreviewEmptyDocument);
 
     const int clientWidth = std::max(1, static_cast<int>(client.right - client.left));
     const int contentWidth = std::max(1, std::min(clientWidth - (kOuterPadding * 2), kMaxContentWidth));
@@ -821,7 +824,7 @@ void PreviewView::Paint() {
                 textColor = linkColor;
             } else if (run.style.code) {
                 textColor = codeText;
-            } else if (run.text == L"(empty document)") {
+            } else if (run.text == emptyDocumentLabel) {
                 textColor = mutedText;
             }
             if (selected) {

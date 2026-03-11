@@ -1,5 +1,6 @@
 #include "Document.h"
 
+#include "LocalizedStrings.h"
 #include "Utf8.h"
 
 #include <windows.h>
@@ -53,7 +54,7 @@ bool Document::ReadFileUtf8(const std::wstring& path, std::string& output, std::
     HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                                 FILE_ATTRIBUTE_NORMAL, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
-        error = L"Could not open the file.";
+        error = LocalizeWide(UiString::ErrorOpenFile);
         return false;
     }
 
@@ -61,7 +62,7 @@ bool Document::ReadFileUtf8(const std::wstring& path, std::string& output, std::
     if (!GetFileSizeEx(handle, &size) || size.QuadPart < 0 ||
         static_cast<ULONGLONG>(size.QuadPart) > static_cast<ULONGLONG>(SIZE_MAX)) {
         CloseHandle(handle);
-        error = L"Could not determine the file size.";
+        error = LocalizeWide(UiString::ErrorFileSize);
         return false;
     }
 
@@ -72,7 +73,7 @@ bool Document::ReadFileUtf8(const std::wstring& path, std::string& output, std::
     CloseHandle(handle);
 
     if (!ok || bytesRead != output.size()) {
-        error = L"Could not read the file.";
+        error = LocalizeWide(UiString::ErrorReadFile);
         return false;
     }
 
@@ -89,7 +90,7 @@ bool Document::ReadFileUtf8(const std::wstring& path, std::string& output, std::
 bool Document::WriteFileUtf8(const std::wstring& path, const std::string& input, std::wstring& error) {
     HANDLE handle = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
-        error = L"Could not create the file.";
+        error = LocalizeWide(UiString::ErrorCreateFile);
         return false;
     }
 
@@ -99,7 +100,7 @@ bool Document::WriteFileUtf8(const std::wstring& path, const std::string& input,
     CloseHandle(handle);
 
     if (!ok || bytesWritten != input.size()) {
-        error = L"Could not write the file.";
+        error = LocalizeWide(UiString::ErrorWriteFile);
         return false;
     }
 

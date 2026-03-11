@@ -57,6 +57,7 @@ add_executable(ultra_markdown WIN32
   src/AppWindow.cpp
   src/Document.cpp
   src/EditorHost.cpp
+  src/LocalizedStrings.cpp
   src/MarkdownRenderer.cpp
   src/PreviewView.cpp
   src/Utf8.cpp

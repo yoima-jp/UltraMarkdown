@@ -1,5 +1,6 @@
 #include "MarkdownRenderer.h"
 
+#include "LocalizedStrings.h"
 #include "Utf8.h"
 
 #include <cmark-gfm.h>
@@ -61,7 +62,7 @@ void CollectInlineSpans(cmark_node* node, PreviewTextStyle style, std::vector<Pr
         style.link = true;
         break;
     case CMARK_NODE_IMAGE:
-        AppendSpan(spans, L"[image] ", style);
+        AppendSpan(spans, LocalizeWide(UiString::PreviewInlineImage), style);
         break;
     default:
         break;
@@ -173,7 +174,7 @@ bool MarkdownRenderer::Build(const std::string& markdownUtf8, PreviewDocument& o
 
     cmark_node* root = cmark_parse_document(markdownUtf8.c_str(), markdownUtf8.size(), CMARK_OPT_DEFAULT);
     if (root == nullptr) {
-        error = L"Could not parse the markdown document.";
+        error = LocalizeWide(UiString::ErrorParseMarkdown);
         return false;
     }
 

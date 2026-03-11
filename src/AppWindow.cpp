@@ -1,5 +1,6 @@
 #include "AppWindow.h"
 
+#include "LocalizedStrings.h"
 #include "Utf8.h"
 #include "resource_ids.h"
 
@@ -8,7 +9,6 @@
 
 namespace {
 constexpr wchar_t kWindowClassName[] = L"UltraMarkdownMainWindow";
-constexpr wchar_t kAppName[] = L"UltraMarkdown";
 }
 
 AppWindow::AppWindow(HINSTANCE instance, std::wstring startupPath)
@@ -17,7 +17,7 @@ AppWindow::AppWindow(HINSTANCE instance, std::wstring startupPath)
 
 int AppWindow::Run(int showCommand) {
     if (!Scintilla_RegisterClasses(instance_)) {
-        MessageBoxW(nullptr, L"Could not initialize Scintilla.", kAppName, MB_ICONERROR | MB_OK);
+        MessageBoxW(nullptr, Localize(UiString::ErrorScintillaInit), Localize(UiString::AppName), MB_ICONERROR | MB_OK);
         return 1;
     }
 
@@ -57,7 +57,7 @@ bool AppWindow::CreateMainWindow(int showCommand) {
         return false;
     }
 
-    hwnd_ = CreateWindowExW(0, kWindowClassName, kAppName,
+    hwnd_ = CreateWindowExW(0, kWindowClassName, Localize(UiString::AppName),
                             WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                             CW_USEDEFAULT, CW_USEDEFAULT, 1100, 760,
                             nullptr, nullptr, instance_, this);
@@ -77,16 +77,16 @@ void AppWindow::CreateMenus() {
     HMENU menuBar = CreateMenu();
     HMENU fileMenu = CreatePopupMenu();
 
-    AppendMenuW(fileMenu, MF_STRING, ID_FILE_NEW, L"&New\tCtrl+N");
-    AppendMenuW(fileMenu, MF_STRING, ID_FILE_OPEN, L"&Open...\tCtrl+O");
-    AppendMenuW(fileMenu, MF_STRING, ID_FILE_SAVE, L"&Save\tCtrl+S");
-    AppendMenuW(fileMenu, MF_STRING, ID_FILE_SAVE_AS, L"Save &As...\tCtrl+Shift+S");
+    AppendMenuW(fileMenu, MF_STRING, ID_FILE_NEW, Localize(UiString::MenuNew));
+    AppendMenuW(fileMenu, MF_STRING, ID_FILE_OPEN, Localize(UiString::MenuOpen));
+    AppendMenuW(fileMenu, MF_STRING, ID_FILE_SAVE, Localize(UiString::MenuSave));
+    AppendMenuW(fileMenu, MF_STRING, ID_FILE_SAVE_AS, Localize(UiString::MenuSaveAs));
     AppendMenuW(fileMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(fileMenu, MF_STRING, ID_FILE_EXIT, L"E&xit");
+    AppendMenuW(fileMenu, MF_STRING, ID_FILE_EXIT, Localize(UiString::MenuExit));
 
-    AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu), L"&File");
-    AppendMenuW(menuBar, MF_STRING, ID_VIEW_RAW, L"&Raw");
-    AppendMenuW(menuBar, MF_STRING, ID_VIEW_PREVIEW, L"&Preview\tF6");
+    AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu), Localize(UiString::MenuFile));
+    AppendMenuW(menuBar, MF_STRING, ID_VIEW_RAW, Localize(UiString::MenuRaw));
+    AppendMenuW(menuBar, MF_STRING, ID_VIEW_PREVIEW, Localize(UiString::MenuPreview));
     SetMenu(hwnd_, menuBar);
 }
 
@@ -109,7 +109,7 @@ void AppWindow::ResizeChildren() {
 }
 
 void AppWindow::UpdateTitle() {
-    std::wstring title = std::wstring(kAppName) + L" - " + document_.GetDisplayName();
+    std::wstring title = std::wstring(Localize(UiString::AppName)) + L" - " + document_.GetDisplayName();
     if (document_.IsDirty()) {
         title += L" *";
     }
@@ -156,8 +156,8 @@ bool AppWindow::ConfirmDiscardChanges() {
 
     const int result = MessageBoxW(
         hwnd_,
-        L"Save changes before continuing?",
-        kAppName,
+        Localize(UiString::PromptSaveBeforeContinue),
+        Localize(UiString::AppName),
         MB_ICONWARNING | MB_YESNOCANCEL
     );
 
@@ -232,7 +232,7 @@ bool AppWindow::DoSaveDocument(bool saveAs) {
 }
 
 void AppWindow::ShowError(const std::wstring& message) {
-    MessageBoxW(hwnd_, message.c_str(), kAppName, MB_ICONERROR | MB_OK);
+    MessageBoxW(hwnd_, message.c_str(), Localize(UiString::AppName), MB_ICONERROR | MB_OK);
 }
 
 std::wstring AppWindow::PromptForOpenPath() {
@@ -240,7 +240,7 @@ std::wstring AppWindow::PromptForOpenPath() {
     OPENFILENAMEW dialog{};
     dialog.lStructSize = sizeof(dialog);
     dialog.hwndOwner = hwnd_;
-    dialog.lpstrFilter = L"Markdown Files (*.md;*.markdown)\0*.md;*.markdown\0All Files (*.*)\0*.*\0";
+    dialog.lpstrFilter = Localize(UiString::FileDialogFilter);
     dialog.lpstrFile = buffer;
     dialog.nMaxFile = MAX_PATH;
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST;
@@ -254,13 +254,13 @@ std::wstring AppWindow::PromptForSavePath() {
     if (document_.HasPath()) {
         wcsncpy_s(buffer, document_.GetPath().c_str(), _TRUNCATE);
     } else {
-        wcsncpy_s(buffer, L"Untitled.md", _TRUNCATE);
+        wcsncpy_s(buffer, Localize(UiString::DefaultUntitledName), _TRUNCATE);
     }
 
     OPENFILENAMEW dialog{};
     dialog.lStructSize = sizeof(dialog);
     dialog.hwndOwner = hwnd_;
-    dialog.lpstrFilter = L"Markdown Files (*.md;*.markdown)\0*.md;*.markdown\0All Files (*.*)\0*.*\0";
+    dialog.lpstrFilter = Localize(UiString::FileDialogFilter);
     dialog.lpstrFile = buffer;
     dialog.nMaxFile = MAX_PATH;
     dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;

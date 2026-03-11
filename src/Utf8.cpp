@@ -1,5 +1,7 @@
 #include "Utf8.h"
 
+#include "LocalizedStrings.h"
+
 #include <windows.h>
 #include <shlwapi.h>
 
@@ -40,7 +42,7 @@ std::string WideToUtf8(const std::wstring& wide) {
 
 std::wstring GetBaseName(const std::wstring& path) {
     if (path.empty()) {
-        return L"Untitled.md";
+        return LocalizeWide(UiString::DefaultUntitledName);
     }
 
     const wchar_t* file = PathFindFileNameW(path.c_str());
