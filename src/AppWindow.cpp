@@ -1,5 +1,6 @@
 #include "AppWindow.h"
 
+#include "app_resource.h"
 #include "FileAssociation.h"
 #include "LocalizedStrings.h"
 #include "resource_ids.h"
@@ -58,6 +59,15 @@ RECT MakeRect(int left, int top, int right, int bottom) noexcept {
     RECT rect{left, top, right, bottom};
     return rect;
 }
+
+HICON LoadAppIcon(HINSTANCE instance, int width, int height) noexcept {
+    HICON icon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, width, height,
+                                               LR_DEFAULTCOLOR | LR_SHARED));
+    if (icon == nullptr) {
+        icon = LoadIconW(nullptr, IDI_APPLICATION);
+    }
+    return icon;
+}
 }
 
 AppWindow::AppWindow(HINSTANCE instance, std::wstring startupPath)
@@ -109,14 +119,16 @@ int AppWindow::Run(int showCommand) {
 }
 
 bool AppWindow::CreateMainWindow(int showCommand) {
-    WNDCLASSW wc{};
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = AppWindow::WindowProc;
     wc.hInstance = instance_;
     wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    wc.hIcon = LoadAppIcon(instance_, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    wc.hIconSm = LoadAppIcon(instance_, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     wc.hbrBackground = nullptr;
-    if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+    if (!RegisterClassExW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
         return false;
     }
 

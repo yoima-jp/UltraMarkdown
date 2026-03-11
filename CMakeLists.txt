@@ -63,6 +63,7 @@ add_executable(ultra_markdown WIN32
   src/PreviewView.cpp
   src/Theme.cpp
   src/Utf8.cpp
+  src/app.rc
 )
 
 target_include_directories(ultra_markdown
