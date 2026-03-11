@@ -1,8 +1,12 @@
 #include "EditorHost.h"
 
 namespace {
-constexpr COLORREF kBackColor = RGB(252, 252, 252);
-constexpr COLORREF kCaretLine = RGB(245, 247, 250);
+constexpr COLORREF kBackColor = RGB(250, 251, 253);
+constexpr COLORREF kTextColor = RGB(39, 45, 54);
+constexpr COLORREF kCaretColor = RGB(31, 111, 235);
+constexpr COLORREF kCaretLine = RGB(243, 247, 252);
+constexpr COLORREF kSelectionBack = RGB(209, 228, 252);
+constexpr COLORREF kSelectionFore = RGB(22, 46, 74);
 }
 
 bool EditorHost::Create(HWND parent, HINSTANCE instance, int controlId) {
@@ -68,7 +72,8 @@ bool EditorHost::IsNotificationFrom(const NMHDR* header) const noexcept {
 void EditorHost::ConfigureDefaults() {
     SendEditor(SCI_SETCODEPAGE, SC_CP_UTF8, 0);
     SendEditor(SCI_STYLESETFONT, STYLE_DEFAULT, reinterpret_cast<sptr_t>("Consolas"));
-    SendEditor(SCI_STYLESETSIZE, STYLE_DEFAULT, 12);
+    SendEditor(SCI_STYLESETSIZE, STYLE_DEFAULT, 13);
+    SendEditor(SCI_STYLESETFORE, STYLE_DEFAULT, kTextColor);
     SendEditor(SCI_STYLESETBACK, STYLE_DEFAULT, kBackColor);
     SendEditor(SCI_STYLECLEARALL, 0, 0);
     SendEditor(SCI_SETWRAPMODE, SC_WRAP_WORD, 0);
@@ -80,8 +85,12 @@ void EditorHost::ConfigureDefaults() {
     SendEditor(SCI_SETINDENT, 4, 0);
     SendEditor(SCI_SETEOLMODE, SC_EOL_CRLF, 0);
     SendEditor(SCI_SETBUFFEREDDRAW, 1, 0);
+    SendEditor(SCI_SETCARETPERIOD, 0, 0);
+    SendEditor(SCI_SETCARETFORE, kCaretColor, 0);
     SendEditor(SCI_SETCARETLINEVISIBLE, 1, 0);
     SendEditor(SCI_SETCARETLINEBACK, kCaretLine, 0);
+    SendEditor(SCI_SETSELFORE, 1, kSelectionFore);
+    SendEditor(SCI_SETSELBACK, 1, kSelectionBack);
     SendEditor(SCI_SETEXTRAASCENT, 2, 0);
     SendEditor(SCI_SETEXTRADESCENT, 2, 0);
     SendEditor(SCI_SETREADONLY, 0, 0);

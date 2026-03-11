@@ -76,7 +76,6 @@ bool AppWindow::CreateMainWindow(int showCommand) {
 void AppWindow::CreateMenus() {
     HMENU menuBar = CreateMenu();
     HMENU fileMenu = CreatePopupMenu();
-    HMENU viewMenu = CreatePopupMenu();
 
     AppendMenuW(fileMenu, MF_STRING, ID_FILE_NEW, L"&New\tCtrl+N");
     AppendMenuW(fileMenu, MF_STRING, ID_FILE_OPEN, L"&Open...\tCtrl+O");
@@ -85,10 +84,9 @@ void AppWindow::CreateMenus() {
     AppendMenuW(fileMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu, MF_STRING, ID_FILE_EXIT, L"E&xit");
 
-    AppendMenuW(viewMenu, MF_STRING, ID_VIEW_TOGGLE_PREVIEW, L"&Toggle Preview\tF6");
-
     AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu), L"&File");
-    AppendMenuW(menuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(viewMenu), L"&View");
+    AppendMenuW(menuBar, MF_STRING, ID_VIEW_RAW, L"&Raw");
+    AppendMenuW(menuBar, MF_STRING, ID_VIEW_PREVIEW, L"&Preview\tF6");
     SetMenu(hwnd_, menuBar);
 }
 
@@ -141,6 +139,7 @@ void AppWindow::SetViewMode(ViewMode mode) {
         SyncPreviewFromDocument();
         editor_.Show(false);
         preview_.Show(true);
+        preview_.Focus();
     } else {
         preview_.Show(false);
         editor_.Show(true);
@@ -308,6 +307,8 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     case WM_SETFOCUS:
         if (viewMode_ == ViewMode::Raw) {
             editor_.Focus();
+        } else {
+            preview_.Focus();
         }
         return 0;
 
@@ -343,6 +344,12 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             return 0;
         case ID_VIEW_TOGGLE_PREVIEW:
             SetViewMode(viewMode_ == ViewMode::Raw ? ViewMode::Preview : ViewMode::Raw);
+            return 0;
+        case ID_VIEW_RAW:
+            SetViewMode(ViewMode::Raw);
+            return 0;
+        case ID_VIEW_PREVIEW:
+            SetViewMode(ViewMode::Preview);
             return 0;
         default:
             break;
