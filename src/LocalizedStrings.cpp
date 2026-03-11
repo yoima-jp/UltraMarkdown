@@ -23,6 +23,8 @@ const wchar_t* Localize(UiString id) noexcept {
                         : L"Could not initialize Scintilla.";
     case UiString::MenuFile:
         return japanese ? L"ファイル(&F)" : L"&File";
+    case UiString::MenuView:
+        return japanese ? L"表示(&V)" : L"&View";
     case UiString::MenuNew:
         return japanese ? L"新規作成(&N)\tCtrl+N" : L"&New\tCtrl+N";
     case UiString::MenuOpen:
@@ -34,9 +36,21 @@ const wchar_t* Localize(UiString id) noexcept {
     case UiString::MenuExit:
         return japanese ? L"終了(&X)" : L"E&xit";
     case UiString::MenuRaw:
-        return japanese ? L"編集" : L"&Raw";
+        return japanese ? L"Raw Markdown\tCtrl+1" : L"&Raw Markdown\tCtrl+1";
     case UiString::MenuPreview:
-        return japanese ? L"プレビュー" : L"&Preview";
+        return japanese ? L"プレビュー\tCtrl+2" : L"&Preview\tCtrl+2";
+    case UiString::MenuTogglePreview:
+        return japanese ? L"プレビュー切替\tF6" : L"&Toggle Preview\tF6";
+    case UiString::MenuDarkMode:
+        return japanese ? L"ダークモード\tCtrl+D" : L"&Dark Mode\tCtrl+D";
+    case UiString::CommandFile:
+        return japanese ? L"ファイル" : L"File";
+    case UiString::CommandRaw:
+        return japanese ? L"Raw" : L"Raw";
+    case UiString::CommandPreview:
+        return japanese ? L"Preview" : L"Preview";
+    case UiString::CommandDarkMode:
+        return japanese ? L"Dark" : L"Dark";
     case UiString::PromptSaveBeforeContinue:
         return japanese ? L"続行する前に変更を保存しますか？"
                         : L"Save changes before continuing?";
@@ -68,6 +82,12 @@ const wchar_t* Localize(UiString id) noexcept {
         return japanese ? L"(空のドキュメント)" : L"(empty document)";
     case UiString::PreviewInlineImage:
         return japanese ? L"[画像] " : L"[image] ";
+    case UiString::StatusLineColumnFormat:
+        return japanese ? L"行 %d, 列 %d" : L"Ln %d, Col %d";
+    case UiString::StatusCountsFormat:
+        return japanese ? L"%d 文字, %d 行" : L"%d chars, %d lines";
+    case UiString::StatusEncodingUtf8:
+        return L"UTF-8";
     default:
         return L"";
     }

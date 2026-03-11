@@ -60,6 +60,7 @@ add_executable(ultra_markdown WIN32
   src/LocalizedStrings.cpp
   src/MarkdownRenderer.cpp
   src/PreviewView.cpp
+  src/Theme.cpp
   src/Utf8.cpp
 )
 
@@ -78,6 +79,7 @@ target_link_libraries(ultra_markdown
     libcmark-gfm_static
     libcmark-gfm-extensions_static
     comctl32
+    dwmapi
     shlwapi
 )
 

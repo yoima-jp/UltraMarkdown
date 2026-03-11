@@ -6,6 +6,7 @@ enum class UiString {
     AppName,
     ErrorScintillaInit,
     MenuFile,
+    MenuView,
     MenuNew,
     MenuOpen,
     MenuSave,
@@ -13,6 +14,12 @@ enum class UiString {
     MenuExit,
     MenuRaw,
     MenuPreview,
+    MenuTogglePreview,
+    MenuDarkMode,
+    CommandFile,
+    CommandRaw,
+    CommandPreview,
+    CommandDarkMode,
     PromptSaveBeforeContinue,
     FileDialogFilter,
     DefaultUntitledName,
@@ -24,6 +31,9 @@ enum class UiString {
     ErrorParseMarkdown,
     PreviewEmptyDocument,
     PreviewInlineImage,
+    StatusLineColumnFormat,
+    StatusCountsFormat,
+    StatusEncodingUtf8,
 };
 
 bool IsJapaneseUi() noexcept;

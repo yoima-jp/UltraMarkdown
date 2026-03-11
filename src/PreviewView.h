@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MarkdownRenderer.h"
+#include "Theme.h"
 
 #include <string>
 #include <vector>
@@ -13,6 +14,7 @@ public:
     void Resize(const RECT& bounds);
     void Show(bool visible);
     void Focus();
+    void ApplyTheme(const Theme& theme);
     void SetDocumentText(const std::string& markdownUtf8);
     HWND GetHandle() const noexcept { return hwnd_; }
 
@@ -79,4 +81,5 @@ private:
     HFONT heading1Font_ = nullptr;
     HFONT heading2Font_ = nullptr;
     HFONT heading3Font_ = nullptr;
+    Theme theme_ = GetCurrentTheme();
 };

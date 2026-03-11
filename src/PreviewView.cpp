@@ -9,13 +9,6 @@
 
 namespace {
 constexpr wchar_t kPreviewClassName[] = L"UltraMarkdownPreview";
-constexpr int kOuterPadding = 24;
-constexpr int kBlockSpacing = 14;
-constexpr int kListIndent = 26;
-constexpr int kQuoteIndent = 16;
-constexpr int kCodePaddingX = 12;
-constexpr int kCodePaddingY = 10;
-constexpr int kMaxContentWidth = 920;
 
 struct Token {
     std::wstring text;
@@ -29,6 +22,39 @@ int GetDpiForWindowSafe(HWND hwnd) {
         return 96;
     }
     return static_cast<int>(GetDpiForWindow(hwnd));
+}
+
+struct PreviewMetrics {
+    int outerPadding = 0;
+    int blockSpacing = 0;
+    int listIndent = 0;
+    int quoteIndent = 0;
+    int quoteBarWidth = 0;
+    int codePaddingX = 0;
+    int codePaddingY = 0;
+    int maxContentWidth = 0;
+    int ruleOffset = 0;
+    int ruleHeight = 0;
+    int paperInset = 0;
+    int cornerRadius = 0;
+};
+
+PreviewMetrics GetPreviewMetrics(HWND hwnd) {
+    const int dpi = GetDpiForWindowSafe(hwnd);
+    return {
+        MulDiv(24, dpi, 96),
+        MulDiv(14, dpi, 96),
+        MulDiv(26, dpi, 96),
+        MulDiv(16, dpi, 96),
+        std::max(2, MulDiv(4, dpi, 96)),
+        MulDiv(12, dpi, 96),
+        MulDiv(10, dpi, 96),
+        MulDiv(920, dpi, 96),
+        MulDiv(8, dpi, 96),
+        MulDiv(16, dpi, 96),
+        MulDiv(12, dpi, 96),
+        MulDiv(10, dpi, 96),
+    };
 }
 
 HFONT CreateFontForWindow(HWND hwnd, int pointSize, int weight, bool italic, const wchar_t* faceName) {
@@ -62,6 +88,18 @@ int FontHeight(HDC hdc, HFONT font) {
 void FillSolidRect(HDC hdc, const RECT& rect, COLORREF color) {
     HBRUSH brush = CreateSolidBrush(color);
     FillRect(hdc, &rect, brush);
+    DeleteObject(brush);
+}
+
+void FillRoundedRect(HDC hdc, const RECT& rect, COLORREF fill, COLORREF border, int radius) {
+    HBRUSH brush = CreateSolidBrush(fill);
+    HPEN pen = CreatePen(PS_SOLID, 1, border);
+    HGDIOBJ previousBrush = SelectObject(hdc, brush);
+    HGDIOBJ previousPen = SelectObject(hdc, pen);
+    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+    SelectObject(hdc, previousPen);
+    SelectObject(hdc, previousBrush);
+    DeleteObject(pen);
     DeleteObject(brush);
 }
 
@@ -159,6 +197,16 @@ void PreviewView::Focus() {
     }
 }
 
+void PreviewView::ApplyTheme(const Theme& theme) {
+    theme_ = theme;
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    CreateFonts();
+    RebuildLayout();
+}
+
 void PreviewView::SetDocumentText(const std::string& markdownUtf8) {
     errorText_.clear();
     if (!renderer_.Build(markdownUtf8, document_, errorText_)) {
@@ -192,6 +240,9 @@ LRESULT PreviewView::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
 
     case WM_GETDLGCODE:
         return DLGC_WANTARROWS;
+
+    case WM_ERASEBKGND:
+        return 1;
 
     case WM_VSCROLL: {
         SCROLLINFO info{};
@@ -309,14 +360,14 @@ HFONT PreviewView::ResolveFont(const PreviewBlock& block, const PreviewTextStyle
 
 void PreviewView::CreateFonts() {
     DestroyFonts();
-    bodyFont_ = CreateFontForWindow(hwnd_, 11, FW_NORMAL, false, L"Segoe UI");
-    bodyBoldFont_ = CreateFontForWindow(hwnd_, 11, FW_SEMIBOLD, false, L"Segoe UI");
-    bodyItalicFont_ = CreateFontForWindow(hwnd_, 11, FW_NORMAL, true, L"Segoe UI");
-    bodyBoldItalicFont_ = CreateFontForWindow(hwnd_, 11, FW_SEMIBOLD, true, L"Segoe UI");
-    codeFont_ = CreateFontForWindow(hwnd_, 10, FW_NORMAL, false, L"Consolas");
-    heading1Font_ = CreateFontForWindow(hwnd_, 20, FW_BOLD, false, L"Segoe UI");
-    heading2Font_ = CreateFontForWindow(hwnd_, 16, FW_BOLD, false, L"Segoe UI");
-    heading3Font_ = CreateFontForWindow(hwnd_, 13, FW_BOLD, false, L"Segoe UI");
+    bodyFont_ = CreateFontForWindow(hwnd_, theme_.previewBodyFontPoints, FW_NORMAL, false, theme_.uiFontName);
+    bodyBoldFont_ = CreateFontForWindow(hwnd_, theme_.previewBodyFontPoints, FW_SEMIBOLD, false, theme_.uiFontName);
+    bodyItalicFont_ = CreateFontForWindow(hwnd_, theme_.previewBodyFontPoints, FW_NORMAL, true, theme_.uiFontName);
+    bodyBoldItalicFont_ = CreateFontForWindow(hwnd_, theme_.previewBodyFontPoints, FW_SEMIBOLD, true, theme_.uiFontName);
+    codeFont_ = CreateFontForWindow(hwnd_, theme_.previewCodeFontPoints, FW_NORMAL, false, theme_.codeFontName);
+    heading1Font_ = CreateFontForWindow(hwnd_, theme_.previewHeading1FontPoints, FW_BOLD, false, theme_.uiFontName);
+    heading2Font_ = CreateFontForWindow(hwnd_, theme_.previewHeading2FontPoints, FW_BOLD, false, theme_.uiFontName);
+    heading3Font_ = CreateFontForWindow(hwnd_, theme_.previewHeading3FontPoints, FW_BOLD, false, theme_.uiFontName);
 }
 
 void PreviewView::DestroyFonts() {
@@ -336,14 +387,15 @@ void PreviewView::RebuildLayout() {
 
     layout_.clear();
     plainText_.clear();
+    const PreviewMetrics metrics = GetPreviewMetrics(hwnd_);
 
     RECT client{};
     GetClientRect(hwnd_, &client);
     const int clientWidth = std::max(1, static_cast<int>(client.right - client.left));
-    const int contentWidth = std::max(1, std::min(clientWidth - (kOuterPadding * 2), kMaxContentWidth));
-    const int columnLeft = std::max(kOuterPadding, (clientWidth - contentWidth) / 2);
+    const int contentWidth = std::max(1, std::min(clientWidth - (metrics.outerPadding * 2), metrics.maxContentWidth));
+    const int columnLeft = std::max(metrics.outerPadding, (clientWidth - contentWidth) / 2);
     const int usableRight = columnLeft + contentWidth;
-    int y = kOuterPadding;
+    int y = metrics.outerPadding;
 
     HDC hdc = GetDC(hwnd_);
     if (hdc == nullptr) {
@@ -478,23 +530,24 @@ void PreviewView::RebuildLayout() {
             block.top = y;
             block.textStart = static_cast<int>(plainText_.size());
 
-            const int quoteOffset = source.quoteDepth * kQuoteIndent;
-            const int indentOffset = source.indentLevel * kListIndent;
+            const int quoteOffset = source.quoteDepth * metrics.quoteIndent;
+            const int indentOffset = source.indentLevel * metrics.listIndent;
             const int left = columnLeft + quoteOffset + indentOffset;
             block.contentLeft = left;
 
             if (source.type == PreviewBlockType::ThematicBreak) {
                 block.drawRule = true;
-                block.ruleY = y + 8;
-                y += 16;
+                block.ruleY = y + metrics.ruleOffset;
+                y += metrics.ruleHeight;
             } else if (source.type == PreviewBlockType::CodeBlock) {
-                y += kCodePaddingY;
+                y += metrics.codePaddingY;
                 block.drawBackground = true;
                 block.backgroundRect.left = left;
                 block.backgroundRect.top = block.top;
                 block.backgroundRect.right = usableRight;
-                layoutTokens(block, TokenizeCode(source.codeText), left + kCodePaddingX, usableRight - kCodePaddingX);
-                y += kCodePaddingY;
+                layoutTokens(block, TokenizeCode(source.codeText), left + metrics.codePaddingX,
+                             usableRight - metrics.codePaddingX);
+                y += metrics.codePaddingY;
                 block.backgroundRect.bottom = y;
             } else {
                 layoutTokens(block, TokenizeParagraph(source.spans), left, usableRight);
@@ -506,7 +559,7 @@ void PreviewView::RebuildLayout() {
             if (index + 1 < document_.blocks.size()) {
                 plainText_ += L'\n';
             }
-            y += kBlockSpacing;
+            y += metrics.blockSpacing;
         }
     }
 
@@ -519,7 +572,7 @@ void PreviewView::RebuildLayout() {
         selectionFocus_ = std::clamp(selectionFocus_, 0, static_cast<int>(plainText_.size()));
     }
 
-    contentHeight_ = std::max(y + kOuterPadding, static_cast<int>(client.bottom - client.top));
+    contentHeight_ = std::max(y + metrics.outerPadding, static_cast<int>(client.bottom - client.top));
     scrollY_ = std::clamp(scrollY_, 0, std::max(contentHeight_ - static_cast<int>(client.bottom - client.top), 0));
     UpdateScrollBar();
     InvalidateRect(hwnd_, nullptr, TRUE);
@@ -724,29 +777,21 @@ void PreviewView::Paint() {
 
     RECT client{};
     GetClientRect(hwnd_, &client);
-    FillSolidRect(hdc, client, RGB(241, 244, 248));
+    const PreviewMetrics metrics = GetPreviewMetrics(hwnd_);
+    FillSolidRect(hdc, client, theme_.previewBackground);
     SetBkMode(hdc, TRANSPARENT);
-
-    const COLORREF bodyText = RGB(33, 40, 48);
-    const COLORREF mutedText = RGB(112, 121, 132);
-    const COLORREF quoteColor = RGB(211, 219, 228);
-    const COLORREF ruleColor = RGB(216, 223, 231);
-    const COLORREF codeBack = RGB(248, 250, 252);
-    const COLORREF codeText = RGB(128, 53, 30);
-    const COLORREF linkColor = RGB(14, 98, 191);
-    const COLORREF selectionFill = RGB(206, 228, 255);
-    const COLORREF selectionText = RGB(16, 54, 96);
     const std::wstring emptyDocumentLabel = LocalizeWide(UiString::PreviewEmptyDocument);
 
     const int clientWidth = std::max(1, static_cast<int>(client.right - client.left));
-    const int contentWidth = std::max(1, std::min(clientWidth - (kOuterPadding * 2), kMaxContentWidth));
-    const int columnLeft = std::max(kOuterPadding, (clientWidth - contentWidth) / 2);
-    RECT paperRect{columnLeft - 12, 12, columnLeft + contentWidth + 12,
-                   std::max(static_cast<int>(client.bottom) - 12, 12)};
-    FillSolidRect(hdc, paperRect, RGB(255, 255, 255));
-    HBRUSH paperBorderBrush = CreateSolidBrush(RGB(227, 232, 238));
-    FrameRect(hdc, &paperRect, paperBorderBrush);
-    DeleteObject(paperBorderBrush);
+    const int contentWidth = std::max(1, std::min(clientWidth - (metrics.outerPadding * 2), metrics.maxContentWidth));
+    const int columnLeft = std::max(metrics.outerPadding, (clientWidth - contentWidth) / 2);
+    RECT paperRect{
+        columnLeft - metrics.paperInset,
+        metrics.paperInset,
+        columnLeft + contentWidth + metrics.paperInset,
+        std::max(static_cast<int>(client.bottom) - metrics.paperInset, metrics.paperInset)
+    };
+    FillRoundedRect(hdc, paperRect, theme_.previewPaperBackground, theme_.previewPaperBorder, metrics.cornerRadius);
 
     const int selectionStart = std::min(selectionAnchor_, selectionFocus_);
     const int selectionEnd = std::max(selectionAnchor_, selectionFocus_);
@@ -761,12 +806,13 @@ void PreviewView::Paint() {
         if (block.source.quoteDepth > 0) {
             for (int depth = 0; depth < block.source.quoteDepth; ++depth) {
                 RECT bar{
-                    columnLeft + block.source.indentLevel * kListIndent + depth * kQuoteIndent,
+                    columnLeft + block.source.indentLevel * metrics.listIndent + depth * metrics.quoteIndent,
                     drawTop,
-                    columnLeft + block.source.indentLevel * kListIndent + depth * kQuoteIndent + 4,
+                    columnLeft + block.source.indentLevel * metrics.listIndent + depth * metrics.quoteIndent +
+                        metrics.quoteBarWidth,
                     drawBottom
                 };
-                FillSolidRect(hdc, bar, quoteColor);
+                FillSolidRect(hdc, bar, theme_.previewQuoteBar);
             }
         }
 
@@ -774,14 +820,12 @@ void PreviewView::Paint() {
             RECT background = block.backgroundRect;
             background.top -= scrollY_;
             background.bottom -= scrollY_;
-            FillSolidRect(hdc, background, codeBack);
-            HBRUSH borderBrush = CreateSolidBrush(RGB(226, 231, 237));
-            FrameRect(hdc, &background, borderBrush);
-            DeleteObject(borderBrush);
+            FillRoundedRect(hdc, background, theme_.previewCodeBackground, theme_.previewCodeBorder,
+                            metrics.cornerRadius);
         }
 
         if (block.drawRule) {
-            HPEN pen = CreatePen(PS_SOLID, 1, ruleColor);
+            HPEN pen = CreatePen(PS_SOLID, 1, theme_.previewRule);
             HGDIOBJ previousPen = SelectObject(hdc, pen);
             MoveToEx(hdc, block.contentLeft, block.ruleY - scrollY_, nullptr);
             LineTo(hdc, columnLeft + contentWidth, block.ruleY - scrollY_);
@@ -815,20 +859,20 @@ void PreviewView::Paint() {
                         run.x + prefixSize.cx + selectedSize.cx,
                         run.y - scrollY_ + run.height
                     };
-                    FillSolidRect(hdc, selectionRect, selectionFill);
+                    FillSolidRect(hdc, selectionRect, theme_.previewSelectionBackground);
                 }
             }
 
-            COLORREF textColor = bodyText;
+            COLORREF textColor = theme_.previewText;
             if (run.style.link) {
-                textColor = linkColor;
+                textColor = theme_.previewLinkText;
             } else if (run.style.code) {
-                textColor = codeText;
+                textColor = theme_.previewCodeText;
             } else if (run.text == emptyDocumentLabel) {
-                textColor = mutedText;
+                textColor = theme_.previewMutedText;
             }
             if (selected) {
-                textColor = selectionText;
+                textColor = theme_.previewSelectionText;
             }
 
             SetTextColor(hdc, textColor);

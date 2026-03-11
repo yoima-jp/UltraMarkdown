@@ -1,9 +1,18 @@
 #pragma once
 
+#include "Theme.h"
+
 #include <string>
 
 #include <windows.h>
 #include <Scintilla.h>
+
+struct EditorStatus {
+    int line = 1;
+    int column = 1;
+    int lineCount = 1;
+    int characterCount = 0;
+};
 
 class EditorHost {
 public:
@@ -11,9 +20,11 @@ public:
     void Resize(const RECT& bounds);
     void Show(bool visible);
     void Focus();
+    void ApplyTheme(const Theme& theme);
 
     void SetTextUtf8(const std::string& textUtf8);
     std::string GetTextUtf8() const;
+    EditorStatus GetStatus() const;
 
     void MarkClean();
     bool IsDirty() const;
@@ -25,7 +36,6 @@ public:
     bool IsLoading() const noexcept { return loading_; }
 
 private:
-    void ConfigureDefaults();
     sptr_t SendEditor(UINT message, uptr_t wParam = 0, sptr_t lParam = 0) const;
 
     HWND hwnd_ = nullptr;
