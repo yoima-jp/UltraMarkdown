@@ -32,6 +32,7 @@ private:
     void CreateAccelerators();
     bool CreateCommandBar();
     bool CreateStatusBar();
+    bool EnsurePreviewCreated();
     void ResizeChildren();
 
     const Theme& GetTheme() const noexcept;
@@ -39,6 +40,8 @@ private:
     void ApplyWindowTheme();
     void RecreateCommandBarFont();
     void RecreateStatusBarFont();
+    void RefreshCaretStatus();
+    void RefreshDocumentMetrics();
     void UpdateTitle();
     void UpdateMenuState();
     void UpdateStatusBar();
@@ -74,6 +77,8 @@ private:
     Document document_;
     EditorHost editor_;
     PreviewView preview_;
+    bool previewCreated_ = false;
+    bool previewDirty_ = true;
     ViewMode viewMode_ = ViewMode::Raw;
     ThemeMode themeMode_ = ThemeMode::System;
     int hotCommandId_ = 0;
@@ -82,6 +87,8 @@ private:
     RECT rawButtonRect_{};
     RECT previewButtonRect_{};
     RECT darkButtonRect_{};
+    EditorCaretStatus caretStatus_;
+    EditorDocumentMetrics documentMetrics_;
     std::wstring statusPrimary_;
     std::wstring statusSecondary_;
     std::wstring statusTertiary_;

@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 
+if(POLICY CMP0069)
+  cmake_policy(SET CMP0069 NEW)
+endif()
+
 project(UltraMarkdown LANGUAGES C CXX)
 
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
@@ -13,6 +17,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
   add_compile_options(/utf-8 /W4 /permissive-)
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+
+  function(enable_size_compile_options target_name)
+    target_compile_options(${target_name} PRIVATE
+      $<$<CONFIG:Release>:/O1 /Gy /Gw>
+      $<$<CONFIG:MinSizeRel>:/Gy /Gw>
+    )
+    set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL TRUE)
+  endfunction()
 endif()
 
 set(CMARK_TESTS OFF CACHE BOOL "" FORCE)
@@ -52,6 +65,10 @@ target_link_libraries(scintilla
     advapi32
 )
 
+if(MSVC)
+  enable_size_compile_options(scintilla)
+endif()
+
 add_executable(ultra_markdown WIN32
   src/main.cpp
   src/AppWindow.cpp
@@ -89,3 +106,12 @@ target_link_libraries(ultra_markdown
 set_target_properties(ultra_markdown PROPERTIES
   OUTPUT_NAME "UltraMarkdown"
 )
+
+if(MSVC)
+  enable_size_compile_options(libcmark-gfm_static)
+  enable_size_compile_options(libcmark-gfm-extensions_static)
+  enable_size_compile_options(ultra_markdown)
+  target_link_options(ultra_markdown PRIVATE
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:/OPT:REF /OPT:ICF>
+  )
+endif()

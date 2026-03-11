@@ -8,9 +8,12 @@
 #include <windows.h>
 #include <Scintilla.h>
 
-struct EditorStatus {
+struct EditorCaretStatus {
     int line = 1;
     int column = 1;
+};
+
+struct EditorDocumentMetrics {
     int lineCount = 1;
     int characterCount = 0;
 };
@@ -25,7 +28,8 @@ public:
 
     void SetTextUtf8(const std::string& textUtf8);
     std::string GetTextUtf8() const;
-    EditorStatus GetStatus() const;
+    EditorCaretStatus GetCaretStatus() const;
+    EditorDocumentMetrics GetDocumentMetrics() const;
 
     void MarkClean();
     bool IsDirty() const;

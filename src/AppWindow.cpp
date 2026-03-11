@@ -193,6 +193,21 @@ bool AppWindow::CreateStatusBar() {
     return statusBar_ != nullptr;
 }
 
+bool AppWindow::EnsurePreviewCreated() {
+    if (previewCreated_) {
+        return true;
+    }
+
+    if (!preview_.Create(hwnd_, instance_, ID_PREVIEW)) {
+        return false;
+    }
+
+    previewCreated_ = true;
+    preview_.Show(false);
+    ResizeChildren();
+    return true;
+}
+
 int AppWindow::MeasureButtonWidth(HWND hwnd, HFONT font, const wchar_t* text, int extraPadding) const noexcept {
     HDC hdc = GetDC(hwnd);
     HGDIOBJ prev = font != nullptr ? SelectObject(hdc, font) : nullptr;
@@ -248,7 +263,9 @@ void AppWindow::ResizeChildren() {
     content.top += commandHeight;
     content.bottom -= statusHeight;
     editor_.Resize(content);
-    preview_.Resize(content);
+    if (previewCreated_) {
+        preview_.Resize(content);
+    }
 
     if (commandBar_ != nullptr) {
         InvalidateRect(commandBar_, nullptr, TRUE);
@@ -305,6 +322,24 @@ void AppWindow::RecreateStatusBarFont() {
     statusFont_ = CreateUiFont(statusBar_ != nullptr ? statusBar_ : hwnd_, GetTheme().uiFontName, 9);
 }
 
+void AppWindow::RefreshCaretStatus() {
+    if (editor_.GetHandle() == nullptr) {
+        caretStatus_ = {};
+        return;
+    }
+
+    caretStatus_ = editor_.GetCaretStatus();
+}
+
+void AppWindow::RefreshDocumentMetrics() {
+    if (editor_.GetHandle() == nullptr) {
+        documentMetrics_ = {};
+        return;
+    }
+
+    documentMetrics_ = editor_.GetDocumentMetrics();
+}
+
 void AppWindow::UpdateTitle() {
     std::wstring title = std::wstring(Localize(UiString::AppName)) + L" - " + document_.GetDisplayName();
     if (document_.IsDirty()) {
@@ -324,11 +359,10 @@ void AppWindow::UpdateStatusBar() {
         return;
     }
 
-    const EditorStatus status = editor_.GetStatus();
     wchar_t buffer[96] = {};
-    swprintf_s(buffer, Localize(UiString::StatusLineColumnFormat), status.line, status.column);
+    swprintf_s(buffer, Localize(UiString::StatusLineColumnFormat), caretStatus_.line, caretStatus_.column);
     statusPrimary_ = buffer;
-    swprintf_s(buffer, Localize(UiString::StatusCountsFormat), status.characterCount, status.lineCount);
+    swprintf_s(buffer, Localize(UiString::StatusCountsFormat), documentMetrics_.characterCount, documentMetrics_.lineCount);
     statusSecondary_ = buffer;
     statusTertiary_ = LocalizeWide(UiString::StatusEncodingUtf8);
     InvalidateRect(statusBar_, nullptr, TRUE);
@@ -498,15 +532,23 @@ void AppWindow::ShowFileMenu() {
 
 void AppWindow::SetDirty(bool dirty) {
     document_.SetDirty(dirty);
+    if (dirty) {
+        previewDirty_ = true;
+    }
     UpdateTitle();
 }
 
 void AppWindow::SyncDocumentFromEditor() {
     document_.SetText(editor_.GetTextUtf8());
+    previewDirty_ = true;
 }
 
 void AppWindow::SyncPreviewFromDocument() {
+    if (!previewCreated_) {
+        return;
+    }
     preview_.SetDocumentText(document_.GetText());
+    previewDirty_ = false;
 }
 
 void AppWindow::SetViewMode(ViewMode mode) {
@@ -514,13 +556,20 @@ void AppWindow::SetViewMode(ViewMode mode) {
         return;
     }
     if (mode == ViewMode::Preview) {
+        if (!EnsurePreviewCreated()) {
+            return;
+        }
         SyncDocumentFromEditor();
-        SyncPreviewFromDocument();
+        if (previewDirty_) {
+            SyncPreviewFromDocument();
+        }
         editor_.Show(false);
         preview_.Show(true);
         preview_.Focus();
     } else {
-        preview_.Show(false);
+        if (previewCreated_) {
+            preview_.Show(false);
+        }
         editor_.Show(true);
         editor_.Focus();
     }
@@ -554,7 +603,10 @@ bool AppWindow::DoNewDocument() {
     editor_.SetTextUtf8({});
     editor_.MarkClean();
     SetDirty(false);
+    previewDirty_ = true;
     SetViewMode(ViewMode::Raw);
+    RefreshCaretStatus();
+    RefreshDocumentMetrics();
     UpdateStatusBar();
     UpdateTitle();
     return true;
@@ -577,9 +629,11 @@ bool AppWindow::DoOpenDocument(const std::wstring& requestedPath) {
 
     editor_.SetTextUtf8(document_.GetText());
     editor_.MarkClean();
-    SyncPreviewFromDocument();
     SetDirty(false);
+    previewDirty_ = true;
     SetViewMode(ViewMode::Raw);
+    RefreshCaretStatus();
+    RefreshDocumentMetrics();
     UpdateStatusBar();
     UpdateTitle();
     return true;
@@ -603,7 +657,9 @@ bool AppWindow::DoSaveDocument(bool saveAs) {
 
     editor_.MarkClean();
     SetDirty(false);
-    SyncPreviewFromDocument();
+    previewDirty_ = true;
+    RefreshCaretStatus();
+    RefreshDocumentMetrics();
     UpdateStatusBar();
     UpdateTitle();
     return true;
@@ -766,14 +822,14 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE:
         if (!editor_.Create(hwnd_, instance_, ID_EDITOR) ||
-            !preview_.Create(hwnd_, instance_, ID_PREVIEW) ||
             !CreateCommandBar() ||
             !CreateStatusBar()) {
             return -1;
         }
         document_.NewDocument();
         editor_.SetTextUtf8({});
-        preview_.Show(false);
+        RefreshCaretStatus();
+        RefreshDocumentMetrics();
         ResizeChildren();
         UpdateStatusBar();
         UpdateTitle();
@@ -808,6 +864,7 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         } else {
             preview_.Focus();
         }
+        RefreshCaretStatus();
         UpdateStatusBar();
         return 0;
     case WM_NOTIFY:
@@ -820,9 +877,15 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
                     SetDirty(false);
                 }
             }
+            if (notification->nmhdr.code == SCN_MODIFIED &&
+                (notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
+                RefreshDocumentMetrics();
+            }
             if (notification->nmhdr.code == SCN_UPDATEUI ||
                 notification->nmhdr.code == SCN_SAVEPOINTLEFT ||
-                notification->nmhdr.code == SCN_SAVEPOINTREACHED) {
+                notification->nmhdr.code == SCN_SAVEPOINTREACHED ||
+                notification->nmhdr.code == SCN_MODIFIED) {
+                RefreshCaretStatus();
                 UpdateStatusBar();
             }
             return 0;

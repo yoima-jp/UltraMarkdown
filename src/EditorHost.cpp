@@ -128,25 +128,35 @@ std::string EditorHost::GetTextUtf8() const {
     return buffer;
 }
 
-EditorStatus EditorHost::GetStatus() const {
+EditorCaretStatus EditorHost::GetCaretStatus() const {
     if (hwnd_ == nullptr) {
         return {};
     }
 
-    const sptr_t length = SendEditor(SCI_GETLENGTH, 0, 0);
     const sptr_t currentPos = SendEditor(SCI_GETCURRENTPOS, 0, 0);
     const sptr_t lineIndex = SendEditor(SCI_LINEFROMPOSITION, 0, currentPos);
     const sptr_t lineStart = SendEditor(SCI_POSITIONFROMLINE, static_cast<uptr_t>(lineIndex), 0);
 
-    EditorStatus status;
+    EditorCaretStatus status;
     status.line = static_cast<int>(lineIndex) + 1;
     status.column = static_cast<int>(SendEditor(
         SCI_COUNTCHARACTERS,
         static_cast<uptr_t>(lineStart),
         currentPos)) + 1;
-    status.lineCount = std::max(1, static_cast<int>(SendEditor(SCI_GETLINECOUNT, 0, 0)));
-    status.characterCount = static_cast<int>(SendEditor(SCI_COUNTCHARACTERS, 0, length));
     return status;
+}
+
+EditorDocumentMetrics EditorHost::GetDocumentMetrics() const {
+    if (hwnd_ == nullptr) {
+        return {};
+    }
+
+    const sptr_t length = SendEditor(SCI_GETLENGTH, 0, 0);
+
+    EditorDocumentMetrics metrics;
+    metrics.lineCount = std::max(1, static_cast<int>(SendEditor(SCI_GETLINECOUNT, 0, 0)));
+    metrics.characterCount = static_cast<int>(SendEditor(SCI_COUNTCHARACTERS, 0, length));
+    return metrics;
 }
 
 void EditorHost::MarkClean() {
