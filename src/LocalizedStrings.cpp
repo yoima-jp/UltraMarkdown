@@ -82,6 +82,20 @@ const wchar_t* Localize(UiString id) noexcept {
         return japanese ? L"(空のドキュメント)" : L"(empty document)";
     case UiString::PreviewInlineImage:
         return japanese ? L"[画像] " : L"[image] ";
+    case UiString::ContextUndo:
+        return japanese ? L"元に戻す" : L"Undo";
+    case UiString::ContextRedo:
+        return japanese ? L"やり直す" : L"Redo";
+    case UiString::ContextCut:
+        return japanese ? L"切り取り" : L"Cut";
+    case UiString::ContextCopy:
+        return japanese ? L"コピー" : L"Copy";
+    case UiString::ContextPaste:
+        return japanese ? L"貼り付け" : L"Paste";
+    case UiString::ContextDelete:
+        return japanese ? L"削除" : L"Delete";
+    case UiString::ContextSelectAll:
+        return japanese ? L"すべて選択" : L"Select All";
     case UiString::StatusLineColumnFormat:
         return japanese ? L"行 %d, 列 %d" : L"Ln %d, Col %d";
     case UiString::StatusCountsFormat:

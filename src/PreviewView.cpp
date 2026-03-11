@@ -10,6 +10,11 @@
 namespace {
 constexpr wchar_t kPreviewClassName[] = L"UltraMarkdownPreview";
 
+enum class ContextCommand : UINT {
+    Copy = 1,
+    SelectAll,
+};
+
 struct Token {
     std::wstring text;
     PreviewTextStyle style;
@@ -37,6 +42,9 @@ struct PreviewMetrics {
     int ruleHeight = 0;
     int paperInset = 0;
     int cornerRadius = 0;
+    int scrollBarWidth = 0;
+    int scrollBarMargin = 0;
+    int scrollBarMinThumbHeight = 0;
 };
 
 PreviewMetrics GetPreviewMetrics(HWND hwnd) {
@@ -54,6 +62,9 @@ PreviewMetrics GetPreviewMetrics(HWND hwnd) {
         MulDiv(16, dpi, 96),
         MulDiv(12, dpi, 96),
         MulDiv(10, dpi, 96),
+        std::max(10, MulDiv(12, dpi, 96)),
+        MulDiv(8, dpi, 96),
+        std::max(28, MulDiv(36, dpi, 96)),
     };
 }
 
@@ -101,6 +112,21 @@ void FillRoundedRect(HDC hdc, const RECT& rect, COLORREF fill, COLORREF border, 
     SelectObject(hdc, previousBrush);
     DeleteObject(pen);
     DeleteObject(brush);
+}
+
+POINT ResolveContextMenuPoint(HWND hwnd, POINT point) noexcept {
+    if (point.x != -1 || point.y != -1) {
+        return point;
+    }
+
+    RECT rect{};
+    GetClientRect(hwnd, &rect);
+    POINT fallback{
+        rect.left + ((rect.right - rect.left) / 2),
+        rect.top + ((rect.bottom - rect.top) / 2),
+    };
+    ClientToScreen(hwnd, &fallback);
+    return fallback;
 }
 
 std::wstring ExpandTabs(std::wstring text) {
@@ -170,7 +196,7 @@ bool PreviewView::Create(HWND parent, HINSTANCE instance, int controlId) {
     RegisterClassW(&wc);
 
     hwnd_ = CreateWindowExW(0, kPreviewClassName, L"",
-                            WS_CHILD | WS_VSCROLL | WS_CLIPCHILDREN | WS_TABSTOP,
+                            WS_CHILD | WS_CLIPCHILDREN | WS_TABSTOP,
                             0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(controlId)),
                             instance, this);
     if (!hwnd_) {
@@ -244,60 +270,98 @@ LRESULT PreviewView::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     case WM_ERASEBKGND:
         return 1;
 
-    case WM_VSCROLL: {
-        SCROLLINFO info{};
-        info.cbSize = sizeof(info);
-        info.fMask = SIF_ALL;
-        GetScrollInfo(hwnd_, SB_VERT, &info);
-        int next = info.nPos;
-        switch (LOWORD(wParam)) {
-        case SB_LINEUP:
-            next -= 32;
-            break;
-        case SB_LINEDOWN:
-            next += 32;
-            break;
-        case SB_PAGEUP:
-            next -= static_cast<int>(info.nPage);
-            break;
-        case SB_PAGEDOWN:
-            next += static_cast<int>(info.nPage);
-            break;
-        case SB_THUMBPOSITION:
-        case SB_THUMBTRACK:
-            next = info.nTrackPos;
-            break;
-        default:
-            break;
-        }
-        ScrollTo(next);
-        return 0;
-    }
-
     case WM_MOUSEWHEEL:
         ScrollTo(scrollY_ - static_cast<short>(HIWORD(wParam)) / WHEEL_DELTA * 48);
         return 0;
 
     case WM_LBUTTONDOWN: {
         SetFocus(hwnd_);
+        const POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        if (IsPointInThumb(point)) {
+            SetCapture(hwnd_);
+            scrollBarDragging_ = true;
+            scrollBarHot_ = true;
+            scrollDragOffsetY_ = point.y - thumbRect_.top;
+            InvalidateRect(hwnd_, nullptr, TRUE);
+            return 0;
+        }
+        if (IsPointInScrollBar(point)) {
+            RECT client{};
+            GetClientRect(hwnd_, &client);
+            const int page = std::max(static_cast<int>(client.bottom - client.top), 0);
+            if (point.y < thumbRect_.top) {
+                ScrollTo(scrollY_ - page);
+            } else if (point.y > thumbRect_.bottom) {
+                ScrollTo(scrollY_ + page);
+            }
+            return 0;
+        }
         SetCapture(hwnd_);
         selecting_ = true;
-        const int position = HitTestTextPosition({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+        const int position = HitTestTextPosition(point);
         SetSelection(position, position);
         return 0;
     }
 
-    case WM_MOUSEMOVE:
+    case WM_MOUSEMOVE: {
+        TRACKMOUSEEVENT event{sizeof(event), TME_LEAVE, hwnd_, 0};
+        TrackMouseEvent(&event);
+        const POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        const bool scrollBarHot = IsPointInThumb(point);
+        if (scrollBarHot != scrollBarHot_) {
+            scrollBarHot_ = scrollBarHot;
+            InvalidateRect(hwnd_, nullptr, TRUE);
+        }
+        if (scrollBarDragging_) {
+            const int trackHeight = scrollBarRect_.bottom - scrollBarRect_.top;
+            const int thumbHeight = thumbRect_.bottom - thumbRect_.top;
+            const int travel = std::max(trackHeight - thumbHeight, 0);
+            RECT client{};
+            GetClientRect(hwnd_, &client);
+            const int page = std::max(static_cast<int>(client.bottom - client.top), 0);
+            const int maxScroll = std::max(contentHeight_ - page, 0);
+            const int thumbTop = std::clamp(point.y - scrollDragOffsetY_, scrollBarRect_.top,
+                                            scrollBarRect_.bottom - thumbHeight);
+            const int nextScroll = travel > 0 ? MulDiv(thumbTop - scrollBarRect_.top, maxScroll, travel) : 0;
+            ScrollTo(nextScroll);
+            return 0;
+        }
         if (selecting_ && (wParam & MK_LBUTTON) != 0) {
-            SetSelection(selectionAnchor_, HitTestTextPosition({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}));
+            SetSelection(selectionAnchor_, HitTestTextPosition(point));
         }
         return 0;
+    }
 
     case WM_LBUTTONUP:
+        if (scrollBarDragging_) {
+            scrollBarDragging_ = false;
+            if (GetCapture() == hwnd_) {
+                ReleaseCapture();
+            }
+            InvalidateRect(hwnd_, nullptr, TRUE);
+            return 0;
+        }
         if (selecting_) {
             selecting_ = false;
             ReleaseCapture();
             SetSelection(selectionAnchor_, HitTestTextPosition({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)}));
+        }
+        return 0;
+
+    case WM_MOUSELEAVE:
+        if (scrollBarHot_) {
+            scrollBarHot_ = false;
+            InvalidateRect(hwnd_, nullptr, TRUE);
+        }
+        return 0;
+
+    case WM_CAPTURECHANGED:
+        if (scrollBarDragging_) {
+            scrollBarDragging_ = false;
+            InvalidateRect(hwnd_, nullptr, TRUE);
+        }
+        if (selecting_) {
+            selecting_ = false;
         }
         return 0;
 
@@ -316,6 +380,10 @@ LRESULT PreviewView::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
 
     case WM_COPY:
         CopySelectionToClipboard();
+        return 0;
+
+    case WM_CONTEXTMENU:
+        ShowContextMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
         return 0;
 
     case WM_PAINT:
@@ -392,7 +460,9 @@ void PreviewView::RebuildLayout() {
     RECT client{};
     GetClientRect(hwnd_, &client);
     const int clientWidth = std::max(1, static_cast<int>(client.right - client.left));
-    const int contentWidth = std::max(1, std::min(clientWidth - (metrics.outerPadding * 2), metrics.maxContentWidth));
+    const int scrollBarReserve = metrics.scrollBarWidth + metrics.scrollBarMargin + metrics.outerPadding;
+    const int contentWidth = std::max(
+        1, std::min(clientWidth - (metrics.outerPadding * 2) - scrollBarReserve, metrics.maxContentWidth));
     const int columnLeft = std::max(metrics.outerPadding, (clientWidth - contentWidth) / 2);
     const int usableRight = columnLeft + contentWidth;
     int y = metrics.outerPadding;
@@ -581,15 +651,37 @@ void PreviewView::RebuildLayout() {
 void PreviewView::UpdateScrollBar() {
     RECT client{};
     GetClientRect(hwnd_, &client);
+    const PreviewMetrics metrics = GetPreviewMetrics(hwnd_);
+    const int page = std::max(static_cast<int>(client.bottom - client.top), 0);
+    scrollBarVisible_ = contentHeight_ > page;
+    if (!scrollBarVisible_) {
+        scrollBarRect_ = RECT{};
+        thumbRect_ = RECT{};
+        scrollBarHot_ = false;
+        scrollBarDragging_ = false;
+        return;
+    }
 
-    SCROLLINFO info{};
-    info.cbSize = sizeof(info);
-    info.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
-    info.nMin = 0;
-    info.nMax = std::max(contentHeight_ - 1, 0);
-    info.nPage = static_cast<UINT>(std::max(static_cast<int>(client.bottom - client.top), 0));
-    info.nPos = scrollY_;
-    SetScrollInfo(hwnd_, SB_VERT, &info, TRUE);
+    scrollBarRect_ = RECT{
+        client.right - metrics.scrollBarMargin - metrics.scrollBarWidth,
+        metrics.scrollBarMargin,
+        client.right - metrics.scrollBarMargin,
+        (std::max)(static_cast<int>(client.bottom) - metrics.scrollBarMargin, metrics.scrollBarMargin)
+    };
+
+    const int maxScroll = std::max(contentHeight_ - page, 0);
+    const int trackHeight = (std::max)(static_cast<int>(scrollBarRect_.bottom - scrollBarRect_.top), 1);
+    const int minThumbHeight = (std::min)(metrics.scrollBarMinThumbHeight, trackHeight);
+    const int thumbHeight = std::clamp(MulDiv(trackHeight, page, std::max(contentHeight_, 1)),
+                                       minThumbHeight, trackHeight);
+    const int travel = std::max(trackHeight - thumbHeight, 0);
+    const int thumbTop = scrollBarRect_.top + (maxScroll > 0 ? MulDiv(travel, scrollY_, maxScroll) : 0);
+    thumbRect_ = RECT{
+        scrollBarRect_.left,
+        thumbTop,
+        scrollBarRect_.right,
+        (std::min)(thumbTop + thumbHeight, static_cast<int>(scrollBarRect_.bottom))
+    };
 }
 
 void PreviewView::ScrollTo(int position) {
@@ -603,11 +695,7 @@ void PreviewView::ScrollTo(int position) {
     }
 
     scrollY_ = clamped;
-    SCROLLINFO info{};
-    info.cbSize = sizeof(info);
-    info.fMask = SIF_POS;
-    info.nPos = scrollY_;
-    SetScrollInfo(hwnd_, SB_VERT, &info, TRUE);
+    UpdateScrollBar();
     InvalidateRect(hwnd_, nullptr, TRUE);
 }
 
@@ -771,19 +859,84 @@ void PreviewView::CopySelectionToClipboard() const {
     CloseClipboard();
 }
 
+bool PreviewView::IsScrollBarVisible() const noexcept {
+    return scrollBarVisible_;
+}
+
+bool PreviewView::IsPointInScrollBar(POINT clientPoint) const noexcept {
+    return IsScrollBarVisible() && PtInRect(&scrollBarRect_, clientPoint) != 0;
+}
+
+bool PreviewView::IsPointInThumb(POINT clientPoint) const noexcept {
+    return IsScrollBarVisible() && PtInRect(&thumbRect_, clientPoint) != 0;
+}
+
+void PreviewView::SelectAll() {
+    if (plainText_.empty()) {
+        return;
+    }
+    SetSelection(0, static_cast<int>(plainText_.size()));
+}
+
+void PreviewView::ShowContextMenu(POINT screenPoint) {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    HMENU menu = CreatePopupMenu();
+    if (menu == nullptr) {
+        return;
+    }
+
+    AppendMenuW(menu, MF_STRING | (HasSelection() ? 0 : MF_GRAYED),
+                static_cast<UINT>(ContextCommand::Copy), Localize(UiString::ContextCopy));
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | (plainText_.empty() ? MF_GRAYED : 0),
+                static_cast<UINT>(ContextCommand::SelectAll), Localize(UiString::ContextSelectAll));
+
+    const POINT point = ResolveContextMenuPoint(hwnd_, screenPoint);
+    const UINT command = TrackPopupMenuEx(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
+                                          point.x, point.y, hwnd_, nullptr);
+    DestroyMenu(menu);
+
+    switch (static_cast<ContextCommand>(command)) {
+    case ContextCommand::Copy:
+        CopySelectionToClipboard();
+        break;
+    case ContextCommand::SelectAll:
+        SelectAll();
+        break;
+    default:
+        break;
+    }
+}
+
 void PreviewView::Paint() {
     PAINTSTRUCT ps{};
-    HDC hdc = BeginPaint(hwnd_, &ps);
+    HDC paintDc = BeginPaint(hwnd_, &ps);
 
     RECT client{};
     GetClientRect(hwnd_, &client);
+    const int clientWidthPixels = std::max(static_cast<int>(client.right - client.left), 1);
+    const int clientHeightPixels = std::max(static_cast<int>(client.bottom - client.top), 1);
+    HDC bufferDc = CreateCompatibleDC(paintDc);
+    HBITMAP bufferBitmap = CreateCompatibleBitmap(paintDc, clientWidthPixels, clientHeightPixels);
+    HBITMAP previousBitmap = nullptr;
+    HDC hdc = paintDc;
+    if (bufferDc != nullptr && bufferBitmap != nullptr) {
+        previousBitmap = static_cast<HBITMAP>(SelectObject(bufferDc, bufferBitmap));
+        hdc = bufferDc;
+    }
+
     const PreviewMetrics metrics = GetPreviewMetrics(hwnd_);
     FillSolidRect(hdc, client, theme_.previewBackground);
     SetBkMode(hdc, TRANSPARENT);
     const std::wstring emptyDocumentLabel = LocalizeWide(UiString::PreviewEmptyDocument);
 
     const int clientWidth = std::max(1, static_cast<int>(client.right - client.left));
-    const int contentWidth = std::max(1, std::min(clientWidth - (metrics.outerPadding * 2), metrics.maxContentWidth));
+    const int scrollBarReserve = metrics.scrollBarWidth + metrics.scrollBarMargin + metrics.outerPadding;
+    const int contentWidth = std::max(
+        1, std::min(clientWidth - (metrics.outerPadding * 2) - scrollBarReserve, metrics.maxContentWidth));
     const int columnLeft = std::max(metrics.outerPadding, (clientWidth - contentWidth) / 2);
     RECT paperRect{
         columnLeft - metrics.paperInset,
@@ -792,6 +945,14 @@ void PreviewView::Paint() {
         std::max(static_cast<int>(client.bottom) - metrics.paperInset, metrics.paperInset)
     };
     FillRoundedRect(hdc, paperRect, theme_.previewPaperBackground, theme_.previewPaperBorder, metrics.cornerRadius);
+    const int clipDiameter = std::max(metrics.cornerRadius * 2, 1);
+    HRGN paperRegion = CreateRoundRectRgn(paperRect.left, paperRect.top, paperRect.right + 1, paperRect.bottom + 1,
+                                          clipDiameter, clipDiameter);
+    const int savedDc = SaveDC(hdc);
+    if (paperRegion != nullptr) {
+        SelectClipRgn(hdc, paperRegion);
+        DeleteObject(paperRegion);
+    }
 
     const int selectionStart = std::min(selectionAnchor_, selectionFocus_);
     const int selectionEnd = std::max(selectionAnchor_, selectionFocus_);
@@ -881,10 +1042,30 @@ void PreviewView::Paint() {
         }
     }
 
-    if (GetFocus() == hwnd_) {
-        RECT focusRect = paperRect;
-        InflateRect(&focusRect, -2, -2);
-        DrawFocusRect(hdc, &focusRect);
+    RestoreDC(hdc, savedDc);
+
+    if (IsScrollBarVisible()) {
+        const int radius = std::max(metrics.scrollBarWidth / 2, 1);
+        FillRoundedRect(hdc, scrollBarRect_, theme_.previewScrollBarTrack, theme_.previewScrollBarTrack, radius);
+        const COLORREF thumbColor = scrollBarDragging_ ? theme_.previewScrollBarThumbActive
+                                                       : (scrollBarHot_ ? theme_.previewScrollBarThumbHot
+                                                                        : theme_.previewScrollBarThumb);
+        RECT thumb = thumbRect_;
+        InflateRect(&thumb, -1, -1);
+        FillRoundedRect(hdc, thumb, thumbColor, thumbColor, radius);
+    }
+
+    if (hdc == bufferDc) {
+        BitBlt(paintDc, 0, 0, clientWidthPixels, clientHeightPixels, bufferDc, 0, 0, SRCCOPY);
+    }
+    if (previousBitmap != nullptr) {
+        SelectObject(bufferDc, previousBitmap);
+    }
+    if (bufferBitmap != nullptr) {
+        DeleteObject(bufferBitmap);
+    }
+    if (bufferDc != nullptr) {
+        DeleteDC(bufferDc);
     }
 
     EndPaint(hwnd_, &ps);

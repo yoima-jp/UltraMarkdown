@@ -55,11 +55,16 @@ private:
     int HitTestTextPosition(POINT clientPoint) const;
     int HitTestTextPosition(HDC hdc, POINT clientPoint) const;
     int HitTestRunPosition(HDC hdc, const LayoutRun& run, const PreviewBlock& block, int clientX) const;
+    bool IsScrollBarVisible() const noexcept;
+    bool IsPointInScrollBar(POINT clientPoint) const noexcept;
+    bool IsPointInThumb(POINT clientPoint) const noexcept;
     void SetSelection(int anchor, int focus);
     void ClearSelection();
     bool HasSelection() const noexcept;
     std::wstring GetSelectedText() const;
     void CopySelectionToClipboard() const;
+    void SelectAll();
+    void ShowContextMenu(POINT screenPoint);
     void Paint();
 
     HWND hwnd_ = nullptr;
@@ -70,9 +75,15 @@ private:
     std::vector<LayoutBlock> layout_;
     int scrollY_ = 0;
     int contentHeight_ = 0;
+    RECT scrollBarRect_{};
+    RECT thumbRect_{};
     int selectionAnchor_ = -1;
     int selectionFocus_ = -1;
+    int scrollDragOffsetY_ = 0;
     bool selecting_ = false;
+    bool scrollBarVisible_ = false;
+    bool scrollBarHot_ = false;
+    bool scrollBarDragging_ = false;
     HFONT bodyFont_ = nullptr;
     HFONT bodyBoldFont_ = nullptr;
     HFONT bodyItalicFont_ = nullptr;

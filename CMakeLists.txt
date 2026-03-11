@@ -81,6 +81,7 @@ target_link_libraries(ultra_markdown
     comctl32
     dwmapi
     shlwapi
+    uxtheme
 )
 
 set_target_properties(ultra_markdown PROPERTIES

@@ -40,12 +40,6 @@ void FillSolidRect(HDC hdc, const RECT& rect, COLORREF color) {
     DeleteObject(brush);
 }
 
-void FrameRectSolid(HDC hdc, const RECT& rect, COLORREF color) {
-    HBRUSH brush = CreateSolidBrush(color);
-    FrameRect(hdc, &rect, brush);
-    DeleteObject(brush);
-}
-
 bool RegisterChildClass(HINSTANCE instance, const wchar_t* className, WNDPROC proc) {
     WNDCLASSW wc{};
     if (GetClassInfoW(instance, className, &wc) != 0) {
@@ -184,15 +178,25 @@ bool AppWindow::CreateStatusBar() {
     return statusBar_ != nullptr;
 }
 
+int AppWindow::MeasureButtonWidth(HWND hwnd, HFONT font, const wchar_t* text, int extraPadding) const noexcept {
+    HDC hdc = GetDC(hwnd);
+    HGDIOBJ prev = font != nullptr ? SelectObject(hdc, font) : nullptr;
+    SIZE textSize{};
+    GetTextExtentPoint32W(hdc, text, static_cast<int>(wcslen(text)), &textSize);
+    if (prev != nullptr) SelectObject(hdc, prev);
+    ReleaseDC(hwnd, hdc);
+    return textSize.cx + ScaleForWindow(hwnd, extraPadding);
+}
+
 void AppWindow::ResizeChildren() {
     RECT client{};
     GetClientRect(hwnd_, &client);
 
-    const int commandHeight = ScaleForWindow(hwnd_, 38);
+    const int commandHeight = ScaleForWindow(hwnd_, 36);
     const int statusHeight = ScaleForWindow(hwnd_, 24);
-    const int buttonInset = ScaleForWindow(hwnd_, 6);
+    const int buttonInset = ScaleForWindow(hwnd_, 5);
     const int buttonHeight = commandHeight - (buttonInset * 2);
-    const int buttonGap = ScaleForWindow(hwnd_, 8);
+    const int buttonGap = ScaleForWindow(hwnd_, 1);
 
     if (commandBar_ != nullptr) {
         MoveWindow(commandBar_, client.left, client.top, client.right - client.left, commandHeight, TRUE);
@@ -201,19 +205,29 @@ void AppWindow::ResizeChildren() {
         MoveWindow(statusBar_, client.left, client.bottom - statusHeight, client.right - client.left, statusHeight, TRUE);
     }
 
-    int x = ScaleForWindow(hwnd_, 12);
+    HWND measureWnd = commandBar_ != nullptr ? commandBar_ : hwnd_;
+    const int filePad = 28;  // extra for dropdown arrow
+    const int normalPad = 24;
+    const int fileWidth = MeasureButtonWidth(measureWnd, commandBarFont_, Localize(UiString::CommandFile), filePad);
+    const int rawWidth = MeasureButtonWidth(measureWnd, commandBarFont_, Localize(UiString::CommandRaw), normalPad);
+    const int previewWidth = MeasureButtonWidth(measureWnd, commandBarFont_, Localize(UiString::CommandPreview), normalPad);
+    const int darkWidth = MeasureButtonWidth(measureWnd, commandBarFont_, Localize(UiString::CommandDarkMode), normalPad);
+
+    // File button left-aligned
+    int x = ScaleForWindow(hwnd_, 8);
     const int y = buttonInset;
-    const int fileWidth = ScaleForWindow(hwnd_, 76);
-    const int rawWidth = ScaleForWindow(hwnd_, 74);
-    const int previewWidth = ScaleForWindow(hwnd_, 94);
-    const int darkWidth = ScaleForWindow(hwnd_, 72);
     fileButtonRect_ = MakeRect(x, y, x + fileWidth, y + buttonHeight);
-    x = fileButtonRect_.right + buttonGap;
-    rawButtonRect_ = MakeRect(x, y, x + rawWidth, y + buttonHeight);
-    x = rawButtonRect_.right + buttonGap;
-    previewButtonRect_ = MakeRect(x, y, x + previewWidth, y + buttonHeight);
-    x = previewButtonRect_.right + buttonGap;
-    darkButtonRect_ = MakeRect(x, y, x + darkWidth, y + buttonHeight);
+
+    // Raw/Preview segment centered between file and dark
+    const int segmentWidth = rawWidth + previewWidth + buttonGap;
+    const int barWidth = client.right - client.left;
+    const int segmentX = (barWidth - segmentWidth) / 2;
+    rawButtonRect_ = MakeRect(segmentX, y, segmentX + rawWidth, y + buttonHeight);
+    previewButtonRect_ = MakeRect(rawButtonRect_.right + buttonGap, y, rawButtonRect_.right + buttonGap + previewWidth, y + buttonHeight);
+
+    // Dark button right-aligned
+    const int rightMargin = ScaleForWindow(hwnd_, 8);
+    darkButtonRect_ = MakeRect(barWidth - rightMargin - darkWidth, y, barWidth - rightMargin, y + buttonHeight);
 
     RECT content = client;
     content.top += commandHeight;
@@ -345,41 +359,68 @@ void AppWindow::PaintCommandBar(HDC hdc) {
     const Theme& theme = GetTheme();
     FillSolidRect(hdc, client, theme.titleBarColor);
 
-    RECT bottomBorder{0, client.bottom - 1, client.right, client.bottom};
-    FillSolidRect(hdc, bottomBorder, theme.windowBorder);
-
     SetBkMode(hdc, TRANSPARENT);
     if (commandBarFont_ != nullptr) {
         SelectObject(hdc, commandBarFont_);
     }
 
+    const int radius = ScaleForWindow(commandBar_, 6);
+
     auto drawButton = [&](int commandId, const RECT& rect, const wchar_t* text, bool selected) {
-        COLORREF fill = theme.titleBarColor;
-        COLORREF border = theme.titleBarColor;
         COLORREF textColor = theme.titleBarTextColor;
+        bool hasFill = false;
+        COLORREF fillColor = theme.titleBarColor;
 
         if (selected) {
-            fill = theme.accentColor;
-            border = theme.accentColor;
+            hasFill = true;
+            fillColor = theme.accentColor;
             textColor = RGB(255, 255, 255);
         } else if (pressedCommandId_ == commandId) {
-            fill = theme.windowBorder;
-            border = theme.windowBorder;
+            hasFill = true;
+            fillColor = theme.commandBarPressedBackground;
         } else if (hotCommandId_ == commandId) {
-            fill = theme.statusBarBackground;
-            border = theme.windowBorder;
+            hasFill = true;
+            fillColor = theme.commandBarHoverBackground;
         }
 
-        FillSolidRect(hdc, rect, fill);
-        FrameRectSolid(hdc, rect, border);
+        if (hasFill) {
+            HBRUSH brush = CreateSolidBrush(fillColor);
+            HPEN pen = CreatePen(PS_NULL, 0, 0);
+            HGDIOBJ prevBrush = SelectObject(hdc, brush);
+            HGDIOBJ prevPen = SelectObject(hdc, pen);
+            RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius * 2, radius * 2);
+            SelectObject(hdc, prevPen);
+            SelectObject(hdc, prevBrush);
+            DeleteObject(pen);
+            DeleteObject(brush);
+        }
+
         SetTextColor(hdc, textColor);
         RECT textRect = rect;
+        if (commandId == kCommandFile) {
+            textRect.right -= ScaleForWindow(commandBar_, 12);
+        }
         DrawTextW(hdc, text, -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
+        // Draw dropdown triangle for File button
         if (commandId == kCommandFile) {
-            RECT arrowRect = rect;
-            arrowRect.left = arrowRect.right - ScaleForWindow(commandBar_, 18);
-            DrawTextW(hdc, L"v", -1, &arrowRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            const int arrowSize = ScaleForWindow(commandBar_, 4);
+            const int arrowX = rect.right - ScaleForWindow(commandBar_, 11);
+            const int arrowY = (rect.top + rect.bottom) / 2;
+            POINT triangle[3] = {
+                {arrowX - arrowSize, arrowY - 1},
+                {arrowX + arrowSize, arrowY - 1},
+                {arrowX, arrowY + arrowSize - 1},
+            };
+            HBRUSH arrowBrush = CreateSolidBrush(textColor);
+            HPEN arrowPen = CreatePen(PS_NULL, 0, 0);
+            HGDIOBJ prevBrush = SelectObject(hdc, arrowBrush);
+            HGDIOBJ prevPen = SelectObject(hdc, arrowPen);
+            Polygon(hdc, triangle, 3);
+            SelectObject(hdc, prevPen);
+            SelectObject(hdc, prevBrush);
+            DeleteObject(arrowPen);
+            DeleteObject(arrowBrush);
         }
     };
 

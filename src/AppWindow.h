@@ -45,6 +45,7 @@ private:
     void PaintCommandBar(HDC hdc);
     void PaintStatusBar(HDC hdc);
     int HitTestCommandBar(POINT point) const noexcept;
+    int MeasureButtonWidth(HWND hwnd, HFONT font, const wchar_t* text, int extraPadding) const noexcept;
     RECT GetCommandButtonRect(int commandId) const noexcept;
     void ShowFileMenu();
     void SetDirty(bool dirty);

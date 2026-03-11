@@ -14,6 +14,8 @@ struct Theme {
     COLORREF accentColor;
     COLORREF titleBarColor;
     COLORREF titleBarTextColor;
+    COLORREF commandBarHoverBackground;
+    COLORREF commandBarPressedBackground;
     COLORREF statusBarBackground;
     COLORREF statusBarBorder;
     COLORREF statusBarText;
@@ -35,10 +37,14 @@ struct Theme {
     COLORREF previewCodeBorder;
     COLORREF previewCodeText;
     COLORREF previewLinkText;
+    COLORREF previewScrollBarTrack;
+    COLORREF previewScrollBarThumb;
+    COLORREF previewScrollBarThumbHot;
+    COLORREF previewScrollBarThumbActive;
     COLORREF previewSelectionBackground;
     COLORREF previewSelectionText;
     const wchar_t* uiFontName;
-    const wchar_t* editorFontName;
+    const char* editorFontName;
     const wchar_t* codeFontName;
     int editorFontPoints;
     int previewBodyFontPoints;
@@ -51,5 +57,5 @@ struct Theme {
 
 bool IsSystemDarkModeEnabled() noexcept;
 ThemeMode ResolveThemeMode(ThemeMode mode) noexcept;
-bool IsDarkTheme(ThemeMode mode) noexcept;
+bool IsDarkTheme(ThemeMode mode = ThemeMode::System) noexcept;
 const Theme& GetCurrentTheme(ThemeMode mode = ThemeMode::System) noexcept;
