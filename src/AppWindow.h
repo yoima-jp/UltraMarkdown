@@ -58,6 +58,7 @@ private:
     bool DoNewDocument();
     bool DoOpenDocument(const std::wstring& path = {});
     bool DoSaveDocument(bool saveAs);
+    void DoSetDefaultMarkdownApp();
     void ShowError(const std::wstring& message);
     std::wstring PromptForOpenPath();
     std::wstring PromptForSavePath();

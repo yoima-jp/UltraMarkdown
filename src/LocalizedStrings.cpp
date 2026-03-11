@@ -33,6 +33,9 @@ const wchar_t* Localize(UiString id) noexcept {
         return japanese ? L"保存(&S)\tCtrl+S" : L"&Save\tCtrl+S";
     case UiString::MenuSaveAs:
         return japanese ? L"名前を付けて保存(&A)...\tCtrl+Shift+S" : L"Save &As...\tCtrl+Shift+S";
+    case UiString::MenuSetDefaultMarkdownApp:
+        return japanese ? L"Markdown ファイルの既定アプリに設定(&D)..."
+                        : L"Set as Default for Markdown Files...";
     case UiString::MenuExit:
         return japanese ? L"終了(&X)" : L"E&xit";
     case UiString::MenuRaw:
@@ -75,6 +78,12 @@ const wchar_t* Localize(UiString id) noexcept {
     case UiString::ErrorWriteFile:
         return japanese ? L"ファイルを書き込めませんでした。"
                         : L"Could not write the file.";
+    case UiString::ErrorRegisterDefaultApp:
+        return japanese ? L"Markdown ファイルの関連付けを登録できませんでした。"
+                        : L"Could not register Markdown file associations.";
+    case UiString::ErrorOpenDefaultAppsSettings:
+        return japanese ? L"Windows の既定のアプリ設定を開けませんでした。"
+                        : L"Could not open Windows Default Apps settings.";
     case UiString::ErrorParseMarkdown:
         return japanese ? L"Markdown ドキュメントを解析できませんでした。"
                         : L"Could not parse the markdown document.";

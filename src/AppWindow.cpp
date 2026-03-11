@@ -1,5 +1,6 @@
 #include "AppWindow.h"
 
+#include "FileAssociation.h"
 #include "LocalizedStrings.h"
 #include "resource_ids.h"
 
@@ -140,6 +141,8 @@ void AppWindow::CreateMenus() {
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_OPEN, Localize(UiString::MenuOpen));
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SAVE, Localize(UiString::MenuSave));
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SAVE_AS, Localize(UiString::MenuSaveAs));
+    AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(fileMenu_, MF_STRING, ID_FILE_SET_DEFAULT_MARKDOWN_APP, Localize(UiString::MenuSetDefaultMarkdownApp));
     AppendMenuW(fileMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu_, MF_STRING, ID_FILE_EXIT, Localize(UiString::MenuExit));
 
@@ -594,6 +597,13 @@ bool AppWindow::DoSaveDocument(bool saveAs) {
     return true;
 }
 
+void AppWindow::DoSetDefaultMarkdownApp() {
+    const DefaultMarkdownAppResult result = RegisterAsDefaultMarkdownApp(hwnd_);
+    if (!result.success) {
+        ShowError(result.error);
+    }
+}
+
 void AppWindow::ShowError(const std::wstring& message) {
     MessageBoxW(hwnd_, message.c_str(), Localize(UiString::AppName), MB_ICONERROR | MB_OK);
 }
@@ -812,6 +822,7 @@ LRESULT AppWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         case ID_FILE_OPEN: DoOpenDocument(); return 0;
         case ID_FILE_SAVE: DoSaveDocument(false); return 0;
         case ID_FILE_SAVE_AS: DoSaveDocument(true); return 0;
+        case ID_FILE_SET_DEFAULT_MARKDOWN_APP: DoSetDefaultMarkdownApp(); return 0;
         case ID_FILE_EXIT: SendMessageW(hwnd_, WM_CLOSE, 0, 0); return 0;
         case ID_VIEW_TOGGLE_PREVIEW: SetViewMode(viewMode_ == ViewMode::Raw ? ViewMode::Preview : ViewMode::Raw); return 0;
         case ID_VIEW_RAW: SetViewMode(ViewMode::Raw); return 0;

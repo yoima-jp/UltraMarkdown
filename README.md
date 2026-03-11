@@ -71,6 +71,7 @@ With a Markdown file:
 - Raw mode is editable and UTF-8 based
 - Preview is generated only when switching into Preview mode
 - File operations: New, Open, Save, Save As
+- `File > Set as Default for Markdown Files...` registers UltraMarkdown as a Markdown handler for the current user and opens Windows Default Apps settings
 - Dirty state is tracked through Scintilla save points
 - Closing, opening, or creating a new document prompts to save changes first
 - Window title shows app name, file name, and `*` when dirty
@@ -100,4 +101,5 @@ Validated locally on Windows in this workspace after building `Release`:
 - Preview does not implement every Markdown feature or every edge case in CommonMark/GFM.
 - Links are styled like links but are not clickable in v1.
 - Save/Open dialogs use the classic Win32 common dialogs and do not support long-path edge cases.
+- On Windows 10/11, the app can register itself for `.md` / `.markdown`, but Windows still requires the user to confirm the default app choice in Settings.
 - No tabs, split view, settings UI, plugins, themes, or background services.

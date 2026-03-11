@@ -4,7 +4,8 @@ constexpr int ID_FILE_NEW = 1001;
 constexpr int ID_FILE_OPEN = 1002;
 constexpr int ID_FILE_SAVE = 1003;
 constexpr int ID_FILE_SAVE_AS = 1004;
-constexpr int ID_FILE_EXIT = 1005;
+constexpr int ID_FILE_SET_DEFAULT_MARKDOWN_APP = 1005;
+constexpr int ID_FILE_EXIT = 1006;
 
 constexpr int ID_VIEW_TOGGLE_PREVIEW = 1101;
 constexpr int ID_VIEW_RAW = 1102;
