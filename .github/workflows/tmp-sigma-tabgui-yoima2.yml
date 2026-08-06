@@ -51,8 +51,9 @@ jobs:
 
       - name: Package modified source
         run: |
-          rm -rf SigmaRemake/build SigmaRemake/.gradle
-          ditto -c -k --sequesterRsrc --keepParent SigmaRemake SigmaRemake-Fabric-1.16.5-1.0.5-yoima.2-source.zip
+          cp -R SigmaRemake SigmaRemake-source
+          rm -rf SigmaRemake-source/build SigmaRemake-source/.gradle
+          ditto -c -k --sequesterRsrc --keepParent SigmaRemake-source SigmaRemake-Fabric-1.16.5-1.0.5-yoima.2-source.zip
 
       - name: Upload build
         uses: actions/upload-artifact@v4
