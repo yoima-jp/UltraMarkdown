@@ -1,19 +1,24 @@
 name: Temporary SigmaRemake build
 
 on:
+  push:
+    branches: [ tmp-sigma-remake-build-20260807 ]
   pull_request:
     branches: [ master ]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip sigma build]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout helper repository
         uses: actions/checkout@v4
+        with:
+          ref: tmp-sigma-remake-build-20260807
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -42,3 +47,15 @@ jobs:
           path: SigmaRemake/build/libs/*.jar
           if-no-files-found: error
           retention-days: 1
+
+      - name: Commit JARs to temporary branch
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p built
+          cp SigmaRemake/build/libs/*.jar built/
+          sha256sum built/*.jar > built/SHA256SUMS.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add built
+          git commit -m 'ci: store SigmaRemake base JAR [skip sigma build]'
+          git push origin HEAD:tmp-sigma-remake-build-20260807
