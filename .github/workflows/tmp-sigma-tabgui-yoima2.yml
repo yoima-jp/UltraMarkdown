@@ -1,0 +1,65 @@
+name: Temporary Sigma TabGUI yoima.2 build
+
+on:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches: [ tmp-sigma-tabgui-yoima2-20260807 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '21'
+
+      - name: Download pinned SigmaRemake source
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/StormingMoon/SigmaRemake/archive/e3a4ef87da8853ce0b5a66adcc4869b530b9323f.zip \
+            --output SigmaRemake.zip
+          unzip -q SigmaRemake.zip
+          mv SigmaRemake-e3a4ef87da8853ce0b5a66adcc4869b530b9323f SigmaRemake
+
+      - name: Apply exact TabGUI reference port
+        run: |
+          base64 --decode tmp-sigma-build/TabGuiModule.java.b64 > \
+            SigmaRemake/src/main/java/io/github/sst/remake/module/impl/gui/TabGuiModule.java
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('SigmaRemake/gradle.properties')
+          s = p.read_text()
+          s = s.replace('mod_version=1.0.5', 'mod_version=1.0.5-yoima.2')
+          p.write_text(s)
+          PY
+
+      - name: Build Fabric mod
+        working-directory: SigmaRemake
+        run: |
+          chmod +x gradlew
+          ./gradlew build --stacktrace
+
+      - name: Package modified source
+        run: |
+          rm -rf SigmaRemake/build SigmaRemake/.gradle
+          ditto -c -k --sequesterRsrc --keepParent SigmaRemake SigmaRemake-Fabric-1.16.5-1.0.5-yoima.2-source.zip
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SigmaRemake-Fabric-1.16.5-1.0.5-yoima.2
+          path: |
+            SigmaRemake/build/libs/*.jar
+            SigmaRemake-Fabric-1.16.5-1.0.5-yoima.2-source.zip
+          if-no-files-found: error
+          retention-days: 1
