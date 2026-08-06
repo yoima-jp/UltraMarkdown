@@ -1,0 +1,1 @@
+Temporary branch used only to build the unmodified StormingMoon/SigmaRemake source pinned at commit e3a4ef87da8853ce0b5a66adcc4869b530b9323f. This branch and pull request are not intended to be merged.
