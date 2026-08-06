@@ -1,0 +1,44 @@
+name: Temporary SigmaRemake build
+
+on:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '21'
+
+      - name: Download pinned SigmaRemake source
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/StormingMoon/SigmaRemake/archive/e3a4ef87da8853ce0b5a66adcc4869b530b9323f.zip \
+            --output SigmaRemake.zip
+          unzip -q SigmaRemake.zip
+          mv SigmaRemake-e3a4ef87da8853ce0b5a66adcc4869b530b9323f SigmaRemake
+
+      - name: Build unmodified source
+        working-directory: SigmaRemake
+        run: |
+          chmod +x gradlew
+          ./gradlew build --stacktrace
+
+      - name: Upload Fabric JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: SigmaRemake-Fabric-1.16.5-base
+          path: SigmaRemake/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 1
