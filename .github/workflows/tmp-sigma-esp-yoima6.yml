@@ -1,0 +1,84 @@
+name: Temporary Sigma ESP yoima.6 build
+
+on:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches: [ tmp-sigma-esp-yoima6-20260807 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '21'
+
+      - name: Download yoima.5 source artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/artifacts/8981417358/zip > previous.zip
+          mkdir previous
+          unzip -q previous.zip -d previous
+          SRC=$(find previous -maxdepth 1 -name '*yoima.5-source.zip' | head -1)
+          test -n "$SRC"
+          mkdir source-unpacked
+          unzip -q "$SRC" -d source-unpacked
+          PROJECT=$(find source-unpacked -maxdepth 1 -type d -name 'SigmaRemake*' | head -1)
+          test -n "$PROJECT"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+
+      - name: Fix Shadow mob target path
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ['PROJECT'])
+          p = root / 'src/main/java/io/github/sst/remake/module/impl/render/esp/ShadowESP.java'
+          s = p.read_text()
+          s = s.replace('import net.minecraft.entity.player.PlayerEntity;', 'import net.minecraft.entity.LivingEntity;')
+          s = s.replace('for (PlayerEntity player : getParent().getPlayerTargets(false)) {', 'for (LivingEntity player : getParent().getTargets()) {')
+          s = s.replace('private void drawFeather(PlayerEntity entity, Vec3d camera, float tickDelta)', 'private void drawFeather(LivingEntity entity, Vec3d camera, float tickDelta)')
+          s = s.replace("// SigmaRemapped's Shadow mode is player-model based.\n", '// Use the common ESP target filter so Players / Mobs / Passives all work.\n')
+          p.write_text(s)
+
+          gp = root / 'gradle.properties'
+          g = gp.read_text().replace('mod_version=1.0.5-yoima.5', 'mod_version=1.0.5-yoima.6')
+          gp.write_text(g)
+
+          assert 'getPlayerTargets(false)' not in s
+          assert s.count('getParent().getTargets()') >= 2
+          PY
+
+      - name: Build Fabric mod
+        working-directory: ${{ env.PROJECT }}
+        run: |
+          chmod +x gradlew
+          ./gradlew build --stacktrace
+
+      - name: Package modified source
+        run: |
+          cp -R "$PROJECT" SigmaRemake-yoima6-source
+          rm -rf SigmaRemake-yoima6-source/build SigmaRemake-yoima6-source/.gradle
+          ditto -c -k --sequesterRsrc --keepParent SigmaRemake-yoima6-source SigmaRemake-Fabric-1.16.5-1.0.5-yoima.6-source.zip
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SigmaRemake-Fabric-1.16.5-1.0.5-yoima.6
+          path: |
+            ${{ env.PROJECT }}/build/libs/*.jar
+            SigmaRemake-Fabric-1.16.5-1.0.5-yoima.6-source.zip
+          if-no-files-found: error
+          retention-days: 1
