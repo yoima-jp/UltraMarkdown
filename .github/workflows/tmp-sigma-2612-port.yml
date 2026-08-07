@@ -41,6 +41,7 @@ jobs:
         run: |
           base64 -d tmp-sigma-build/port2612-stage1-overlay.tar.gz.b64 > overlay.tar.gz
           tar -xzf overlay.tar.gz -C "$PROJECT"
+          sed -i 's/gradle-9.4.0-bin.zip/gradle-9.5.0-bin.zip/' "$PROJECT/gradle/wrapper/gradle-wrapper.properties"
           rm -f "$PROJECT/src/main/resources/sigma-remake.accesswidener"
           rm -f "$PROJECT/src/main/java/io/github/sst/remake/manager/impl/ViaManager.java"
           rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinClientPlayNetworkHandler.java"
