@@ -1,6 +1,8 @@
 name: Temporary Sigma 26.1.2 source extraction
 
 on:
+  pull_request:
+    branches: [ master ]
   push:
     branches: [ tmp-sigma-2612-port-20260807 ]
   workflow_dispatch:
