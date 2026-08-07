@@ -35,6 +35,16 @@ jobs:
         run: |
           base64 -D -i tmp-sigma-build/yoima5-overlay.tar.gz.b64 -o yoima5-overlay.tar.gz
           tar -xzf yoima5-overlay.tar.gz -C SigmaRemake
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('SigmaRemake/src/main/java/io/github/sst/remake/module/impl/render/esp/ShadowESP.java')
+          s = p.read_text()
+          s = s.replace('import org.lwjgl.opengl.GL11;\n', 'import org.lwjgl.opengl.GL11;\nimport org.lwjgl.opengl.GL13;\n')
+          s = s.replace('GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_TEXTURE_ENV_MODE, GL11.GL_COMBINE);', 'GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_TEXTURE_ENV_MODE, GL13.GL_COMBINE);')
+          s = s.replace('GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_COMBINE_RGB, GL11.GL_REPLACE);', 'GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL13.GL_COMBINE_RGB, GL11.GL_REPLACE);')
+          s = s.replace('GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL11.GL_SRC0_RGB, GL11.GL_CONSTANT);', 'GL11.glTexEnvi(GL11.GL_TEXTURE_ENV, GL13.GL_SOURCE0_RGB, GL13.GL_CONSTANT);')
+          p.write_text(s)
+          PY
 
       - name: Build Fabric mod
         working-directory: SigmaRemake
