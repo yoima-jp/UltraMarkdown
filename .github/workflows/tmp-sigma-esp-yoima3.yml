@@ -33,7 +33,7 @@ jobs:
 
       - name: Apply yoima.3 overlay
         run: |
-          base64 --decode tmp-sigma-build/yoima3-overlay.tar.gz.b64 > yoima3-overlay.tar.gz
+          base64 -D < tmp-sigma-build/yoima3-overlay.tar.gz.b64 > yoima3-overlay.tar.gz
           tar -xzf yoima3-overlay.tar.gz -C SigmaRemake
 
       - name: Build Fabric mod
