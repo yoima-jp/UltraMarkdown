@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 jobs:
-  migrate:
+  build:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -20,16 +20,16 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: microsoft
-          java-version: '21'
+          java-version: '25'
 
-      - name: Download yoima.7 source
+      - name: Download Mojang-named 1.16.5 source
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/${{ github.repository }}/actions/artifacts/8982275533/zip > previous.zip
-          mkdir previous
-          unzip -q previous.zip -d previous
-          SRC=$(find previous -maxdepth 1 -name '*yoima.7-source.zip' | head -1)
+          gh api repos/${{ github.repository }}/actions/artifacts/8982791154/zip > migrated-artifact.zip
+          mkdir migrated-artifact
+          unzip -q migrated-artifact.zip -d migrated-artifact
+          SRC=$(find migrated-artifact -maxdepth 1 -name '*source.zip' | head -1)
           test -n "$SRC"
           mkdir source-unpacked
           unzip -q "$SRC" -d source-unpacked
@@ -37,22 +37,36 @@ jobs:
           test -n "$PROJECT"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Migrate Yarn names to Mojang mappings on 1.16.5
+      - name: Apply 26.1.2 stage1 overlay and remove ViaVersion
+        run: |
+          base64 -d tmp-sigma-build/port2612-stage1-overlay.tar.gz.b64 > overlay.tar.gz
+          tar -xzf overlay.tar.gz -C "$PROJECT"
+          rm -f "$PROJECT/src/main/resources/sigma-remake.accesswidener"
+          rm -f "$PROJECT/src/main/java/io/github/sst/remake/manager/impl/ViaManager.java"
+          rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinClientPlayNetworkHandler.java"
+          rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinConfirmScreenActionC2SPacket.java"
+          rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinConfirmScreenActionS2CPacket.java"
+          rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinMultiplayerScreen.java"
+          rm -rf "$PROJECT/src/main/java/io/github/sst/remake/util/viaversion"
+
+      - name: Build Fabric 26.1.2
         working-directory: ${{ env.PROJECT }}
         run: |
           chmod +x gradlew
-          ./gradlew migrateMappings --mappings "net.minecraft:mappings:1.16.5" --input src/main/java --output remappedSrc --stacktrace
-          rm -rf src/main/java
-          mv remappedSrc src/main/java
+          ./gradlew build --stacktrace
 
-      - name: Package migrated source
+      - name: Package source
+        if: success()
         run: |
-          cp -R "$PROJECT" SigmaRemake-mojmap-1.16.5
-          rm -rf SigmaRemake-mojmap-1.16.5/build SigmaRemake-mojmap-1.16.5/.gradle
-          zip -qr SigmaRemake-mojmap-1.16.5-source.zip SigmaRemake-mojmap-1.16.5
+          cp -R "$PROJECT" SigmaRemake-Fabric-26.1.2-source
+          rm -rf SigmaRemake-Fabric-26.1.2-source/build SigmaRemake-Fabric-26.1.2-source/.gradle
+          zip -qr SigmaRemake-Fabric-26.1.2-yoima.8-source.zip SigmaRemake-Fabric-26.1.2-source
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: SigmaRemake-mojmap-1.16.5-source
-          path: SigmaRemake-mojmap-1.16.5-source.zip
+          name: SigmaRemake-Fabric-26.1.2-yoima.8
+          path: |
+            ${{ env.PROJECT }}/build/libs/*.jar
+            SigmaRemake-Fabric-26.1.2-yoima.8-source.zip
           retention-days: 1
