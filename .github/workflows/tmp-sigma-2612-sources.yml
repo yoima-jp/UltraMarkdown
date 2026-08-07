@@ -1,0 +1,50 @@
+name: Temporary Sigma 26.1.2 source extraction
+
+on:
+  push:
+    branches: [ tmp-sigma-2612-port-20260807 ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '25'
+      - name: Prepare 26.1.2 project
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/artifacts/8982791154/zip > migrated-artifact.zip
+          mkdir migrated-artifact source-unpacked
+          unzip -q migrated-artifact.zip -d migrated-artifact
+          SRC=$(find migrated-artifact -maxdepth 1 -name '*source.zip' | head -1)
+          unzip -q "$SRC" -d source-unpacked
+          PROJECT=$(find source-unpacked -maxdepth 1 -type d -name 'SigmaRemake*' | head -1)
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          base64 -d tmp-sigma-build/port2612-stage1-overlay.tar.gz.b64 > overlay.tar.gz
+          tar -xzf overlay.tar.gz -C "$PROJECT"
+          sed -i 's/gradle-9.4.0-bin.zip/gradle-9.5.0-bin.zip/' "$PROJECT/gradle/wrapper/gradle-wrapper.properties"
+      - name: Generate Minecraft sources
+        working-directory: ${{ env.PROJECT }}
+        run: |
+          chmod +x gradlew
+          ./gradlew genSources --stacktrace
+      - name: Collect source jars
+        run: |
+          mkdir collected
+          find "$HOME/.gradle" "$PROJECT/.gradle" -type f \( -iname '*26.1.2*sources*.jar' -o -iname '*minecraft*sources*.jar' \) -print -exec cp -n {} collected/ \; || true
+          find collected -maxdepth 1 -type f -printf '%f\n'
+          test "$(find collected -type f | wc -l)" -gt 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-26.1.2-generated-sources
+          path: collected/
+          retention-days: 1
