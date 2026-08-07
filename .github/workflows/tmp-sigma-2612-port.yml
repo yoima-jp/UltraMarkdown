@@ -37,7 +37,7 @@ jobs:
           test -n "$PROJECT"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Apply 26.1.2 stage1 overlay and remove ViaVersion
+      - name: Apply 26.1.2 migration overlays and remove ViaVersion
         run: |
           base64 -d tmp-sigma-build/port2612-stage1-overlay.tar.gz.b64 > overlay.tar.gz
           tar -xzf overlay.tar.gz -C "$PROJECT"
@@ -49,6 +49,8 @@ jobs:
           rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinConfirmScreenActionS2CPacket.java"
           rm -f "$PROJECT/src/main/java/io/github/sst/remake/mixin/MixinMultiplayerScreen.java"
           rm -rf "$PROJECT/src/main/java/io/github/sst/remake/util/viaversion"
+          base64 -d tmp-sigma-build/port2612-stage2.patch.gz.b64 | gzip -d > stage2.patch
+          (cd "$PROJECT" && patch -p1 < "$GITHUB_WORKSPACE/stage2.patch")
 
       - name: Build Fabric 26.1.2
         working-directory: ${{ env.PROJECT }}
